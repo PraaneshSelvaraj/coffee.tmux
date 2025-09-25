@@ -1,0 +1,4 @@
+name: "tmux-ip-addrress"
+url: "anghootys/tmux-ip-address"
+local: False
+source: ["ip_address.tmux"]

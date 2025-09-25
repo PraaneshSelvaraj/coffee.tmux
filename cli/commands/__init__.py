@@ -1,0 +1,1 @@
+"""Coffee CLI package"""
