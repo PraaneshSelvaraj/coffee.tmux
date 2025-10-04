@@ -37,6 +37,8 @@ dev = [
   "isort>=5.12.0",
   "mypy>=1.0.0",
   "types-PyYAML",
+  "pytest>=8.0.0",
+  "pytest-cov>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -79,3 +81,7 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 strict_optional = true
 check_untyped_defs = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
