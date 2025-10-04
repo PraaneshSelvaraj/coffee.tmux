@@ -1,7 +1,8 @@
 import subprocess
 import threading
 from typing import Any, Dict, List, Optional
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import core.pluginUpdater as pu
 
 

@@ -1,5 +1,6 @@
-from unittest.mock import mock_open, patch
 from typing import Any
+from unittest.mock import mock_open, patch
+
 import core.lock_file_manager as lfm
 
 

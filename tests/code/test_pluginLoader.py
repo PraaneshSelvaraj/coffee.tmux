@@ -1,8 +1,10 @@
 import os
-from typing import Any, Dict, List
 from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, mock_open, patch
+
 import pytest
+
 import core.pluginLoader as pl
 
 

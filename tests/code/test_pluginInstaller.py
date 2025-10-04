@@ -1,7 +1,8 @@
-import subprocess
 import datetime
+import subprocess
 from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import core.pluginInstaller as pi
 
 

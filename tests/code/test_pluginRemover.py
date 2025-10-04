@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Union
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import core.pluginRemover as pr
 
 
