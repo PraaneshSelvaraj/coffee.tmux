@@ -1,4 +1,4 @@
-from typing import Any, List, Set
+from typing import Any
 
 from rich.box import ROUNDED
 from rich.layout import Layout

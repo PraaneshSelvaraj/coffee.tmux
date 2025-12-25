@@ -1,8 +1,8 @@
 import os
 import subprocess
 import threading
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Callable
 
 from core import lock_file_manager as lfm
 
@@ -10,11 +10,11 @@ from core import lock_file_manager as lfm
 class PluginUpdater:
     def __init__(self, plugins_dir: str) -> None:
         self.plugins_dir = plugins_dir
-        self._update_threads: Dict[str, threading.Thread] = {}
+        self._update_threads: dict[str, threading.Thread] = {}
 
     def _safe_check_output(
-        self, cmd: List[str], cwd: Optional[str] = None, default: Optional[Any] = None
-    ) -> Optional[str]:
+        self, cmd: list[str], cwd: str | None = None, default: Any | None = None
+    ) -> str | None:
         try:
             return subprocess.check_output(cmd, cwd=cwd, text=True).strip()
         except (subprocess.CalledProcessError, FileNotFoundError):
@@ -22,7 +22,7 @@ class PluginUpdater:
 
     def _get_local_head_commit(
         self, plugin_path: str, short: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         out = self._safe_check_output(["git", "rev-parse", "HEAD"], cwd=plugin_path)
         if out and short:
             return out[:7]
@@ -41,7 +41,7 @@ class PluginUpdater:
 
         return "Unknown"
 
-    def _get_time_since_tag(self, plugin_path: str, tag: Optional[str]) -> str:
+    def _get_time_since_tag(self, plugin_path: str, tag: str | None) -> str:
         if not tag:
             return "Unknown"
 
@@ -59,7 +59,7 @@ class PluginUpdater:
 
         return "Unknown"
 
-    def _get_remote_tags(self, repo_url: str) -> List[str]:
+    def _get_remote_tags(self, repo_url: str) -> list[str]:
         try:
             result = subprocess.run(
                 ["git", "ls-remote", "--tags", repo_url],
@@ -69,7 +69,7 @@ class PluginUpdater:
             )
             if result.returncode != 0:
                 return []
-            tags: List[str] = []
+            tags: list[str] = []
             for line in result.stdout.splitlines():
                 parts = line.split()
                 if len(parts) == 2 and "refs/tags/" in parts[1]:
@@ -81,7 +81,7 @@ class PluginUpdater:
         except Exception:
             return []
 
-    def _get_latest_commit(self, repo_url: str, branch: str = "HEAD") -> Optional[str]:
+    def _get_latest_commit(self, repo_url: str, branch: str = "HEAD") -> str | None:
         try:
             result = subprocess.run(
                 ["git", "ls-remote", repo_url, branch],
@@ -95,7 +95,7 @@ class PluginUpdater:
             pass
         return None
 
-    def _get_tag_commit_hash(self, repo_url: str, tag: str) -> Optional[str]:
+    def _get_tag_commit_hash(self, repo_url: str, tag: str) -> str | None:
         try:
             result = subprocess.run(
                 ["git", "ls-remote", repo_url, f"refs/tags/{tag}"],
@@ -112,8 +112,8 @@ class PluginUpdater:
     def _write_lockfile_update(
         self,
         name: str,
-        new_tag: Optional[str] = None,
-        new_commit: Optional[str] = None,
+        new_tag: str | None = None,
+        new_commit: str | None = None,
     ) -> bool:
         try:
             lock_data = lfm.read_lock_file()
@@ -124,15 +124,15 @@ class PluginUpdater:
                         git_info["commit_hash"] = new_commit
                     if new_tag is not None:
                         git_info["tag"] = new_tag
-                    git_info["last_pull"] = datetime.utcnow().isoformat()
+                    git_info["last_pull"] = datetime.now(timezone.utc).isoformat()
                     break
             lfm.write_lock_file(lock_data)
             return True
         except Exception:
             return False
 
-    def check_for_updates(self) -> List[Dict[str, Any]]:
-        updates: List[Dict[str, Any]] = []
+    def check_for_updates(self) -> list[dict[str, Any]]:
+        updates: list[dict[str, Any]] = []
         lock_data = lfm.read_lock_file()
         for plugin in lock_data.get("plugins", []):
             name = plugin["name"]
@@ -225,8 +225,8 @@ class PluginUpdater:
 
     def update_plugin(
         self,
-        update_info: Dict[str, Any],
-        progress_callback: Optional[Callable[[str, int], None]] = None,
+        update_info: dict[str, Any],
+        progress_callback: Callable[[str, int], None] | None = None,
     ) -> bool:
         name = update_info["name"]
         internal = update_info["_internal"]
@@ -309,8 +309,8 @@ class PluginUpdater:
 
     def update_plugin_async(
         self,
-        update_info: Dict[str, Any],
-        progress_callback: Optional[Callable[[str, int], None]] = None,
+        update_info: dict[str, Any],
+        progress_callback: Callable[[str, int], None] | None = None,
     ) -> threading.Thread:
         name = update_info["name"]
 
@@ -332,10 +332,10 @@ class PluginUpdater:
 
     def update_marked_plugins(
         self,
-        updates: List[Dict[str, Any]],
-        progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> List[threading.Thread]:
-        threads: List[threading.Thread] = []
+        updates: list[dict[str, Any]],
+        progress_callback: Callable[[str, int], None] | None = None,
+    ) -> list[threading.Thread]:
+        threads: list[threading.Thread] = []
         for update in updates:
             if update.get("marked", False):
                 thread = self.update_plugin_async(update, progress_callback)
@@ -344,10 +344,10 @@ class PluginUpdater:
 
     def update_all_plugins(
         self,
-        updates: List[Dict[str, Any]],
-        progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> List[threading.Thread]:
-        threads: List[threading.Thread] = []
+        updates: list[dict[str, Any]],
+        progress_callback: Callable[[str, int], None] | None = None,
+    ) -> list[threading.Thread]:
+        threads: list[threading.Thread] = []
         for update in updates:
             if update.get("_internal", {}).get("update_available", False):
                 thread = self.update_plugin_async(update, progress_callback)
@@ -379,7 +379,7 @@ class PluginUpdater:
             else:
                 print(f"Failed to update {name}")
 
-    def get_update_status(self, plugin_name: str) -> Optional[threading.Thread]:
+    def get_update_status(self, plugin_name: str) -> threading.Thread | None:
         return self._update_threads.get(plugin_name)
 
     def cancel_update(self, plugin_name: str) -> bool:

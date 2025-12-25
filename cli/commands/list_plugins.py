@@ -2,7 +2,7 @@
 List command implementation
 """
 
-from typing import Any, List
+from typing import Any
 
 from core import PluginRemover
 
@@ -27,7 +27,7 @@ def run(args: Args) -> int:
     """Run list command"""
     try:
         remover = PluginRemover(COFFEE_PLUGINS_DIR)
-        plugins: List[dict[str, Any]] = remover.get_installed_plugins()
+        plugins: list[dict[str, Any]] = remover.get_installed_plugins()
 
         if not plugins:
             if not args.quiet:

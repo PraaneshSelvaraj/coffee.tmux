@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core import lock_file_manager as lfm
 
@@ -8,7 +8,7 @@ from core import lock_file_manager as lfm
 class PluginSourcer:
     def source_enabled_plugins(self) -> None:
         lock_data = lfm.read_lock_file()
-        enabled_plugins: List[Dict[str, Any]] = [
+        enabled_plugins: list[dict[str, Any]] = [
             plugin
             for plugin in lock_data.get("plugins", [])
             if plugin.get("enabled", False)
@@ -16,10 +16,10 @@ class PluginSourcer:
         for plugin in enabled_plugins:
             self._source_plugin(plugin)
 
-    def _source_plugin(self, plugin: Dict[str, Any]) -> None:
-        plugin_name: Optional[str] = plugin.get("name")
-        scripts: List[str] = plugin.get("sources", [])
-        plugin_dir: Optional[str] = os.path.dirname(scripts[0]) if scripts else None
+    def _source_plugin(self, plugin: dict[str, Any]) -> None:
+        plugin_name: str | None = plugin.get("name")
+        scripts: list[str] = plugin.get("sources", [])
+        plugin_dir: str | None = os.path.dirname(scripts[0]) if scripts else None
         if not scripts or not plugin_dir:
             return
         for script in scripts:
@@ -44,7 +44,7 @@ class PluginSourcer:
 
     def _set_plugin_enabled(self, plugin_name: str, state: bool) -> None:
         lock_data = lfm.read_lock_file()
-        plugins: List[Dict[str, Any]] = lock_data.get("plugins", [])
+        plugins: list[dict[str, Any]] = lock_data.get("plugins", [])
         for plugin in plugins:
             if plugin.get("name") == plugin_name:
                 plugin["enabled"] = state

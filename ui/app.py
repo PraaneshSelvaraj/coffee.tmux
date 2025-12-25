@@ -1,5 +1,6 @@
 import os
-from typing import Any, List
+import traceback
+from typing import Any
 
 from rich.console import Console
 from textual import work
@@ -42,7 +43,7 @@ class PluginManagerApp(App):
         Binding("u", "update_marked", "Update Marked", show=False),
         # Removal
         Binding("r", "remove_marked", "Remove Marked", show=False),
-        Binding("ctrl+r", "refresh_remove_list", "Refresh Remove List", show=False),
+        Binding("ctrl+r", "refresh_remove_list", "Refresh Remove list", show=False),
         # Installation
         Binding("i", "install_marked", "Install Marked", show=False),
         Binding("ctrl+a", "install_all", "Install All", show=False),
@@ -169,7 +170,7 @@ class PluginManagerApp(App):
             self.rich_display.refresh()
 
     @work(exclusive=True, thread=True)
-    def install_plugins_in_background(self, plugins_to_install: List[dict]) -> None:
+    def install_plugins_in_background(self, plugins_to_install: list[dict]) -> None:
         try:
             console.log(
                 f"[blue]Background installation started for plugins: {[p['name'] for p in plugins_to_install]}[/blue]"
@@ -179,7 +180,7 @@ class PluginManagerApp(App):
                 PLUGINS_DIR,
                 os.path.expanduser("~/.config/tmux/"),
             )
-            installed_plugins: List[str] = []
+            installed_plugins: list[str] = []
             for plugin_data in plugins_to_install:
                 plugin_name = plugin_data["name"]
                 config = plugin_data["_config"]
@@ -221,8 +222,6 @@ class PluginManagerApp(App):
             console.log("[blue]Background installation worker completed[/blue]")
         except Exception as e:
             console.log(f"[red]Error in background installation: {e}[/red]")
-            import traceback
-
             console.log(f"[red]Traceback: {traceback.format_exc()}[/red]")
             self.call_from_thread(
                 lambda: self.notify(f"Installation failed: {str(e)}", severity="error")
@@ -257,7 +256,7 @@ class PluginManagerApp(App):
         self.rich_display.refresh()
 
     @work(exclusive=True, thread=True)
-    def update_plugins_in_background(self, plugins_to_update: List[dict]) -> None:
+    def update_plugins_in_background(self, plugins_to_update: list[dict]) -> None:
         try:
             for plugin in plugins_to_update:
                 plugin_name = plugin["name"]
@@ -311,7 +310,7 @@ class PluginManagerApp(App):
                 self.notify("No updates available.")
             self.rich_display.refresh()
 
-    def _update_scroll_offset(self, display_list: List[Any]) -> None:
+    def _update_scroll_offset(self, display_list: list[Any]) -> None:
         if (
             self.app_state.current_selection
             >= self.app_state.scroll_offset + VISIBLE_ROWS
@@ -323,12 +322,12 @@ class PluginManagerApp(App):
             self.app_state.scroll_offset = self.app_state.current_selection
 
     @work(exclusive=True, thread=True)
-    def remove_plugins_in_background(self, plugins_to_remove: List[str]) -> None:
+    def remove_plugins_in_background(self, plugins_to_remove: list[str]) -> None:
         try:
             console.log(
                 f"[blue]Background removal started for plugins: {plugins_to_remove}[/blue]"
             )
-            removed_plugins: List[str] = []
+            removed_plugins: list[str] = []
             for plugin_name in plugins_to_remove:
                 console.log(f"[blue]Starting removal for {plugin_name}[/blue]")
                 success = self.plugin_remover.remove_plugin(
@@ -368,8 +367,6 @@ class PluginManagerApp(App):
             self.call_from_thread(self.rich_display.refresh)
             console.log("[blue]Background removal worker completed[/blue]")
         except Exception as e:
-            import traceback
-
             console.log(f"[red]Error in background removal: {e}[/red]")
             console.log(f"[red]Traceback: {traceback.format_exc()}[/red]")
             self.call_from_thread(

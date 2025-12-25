@@ -1,7 +1,7 @@
-import datetime
 import os
 import subprocess
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from datetime import datetime, timezone
+from typing import Any, Callable
 
 from core import lock_file_manager as lfm
 
@@ -9,7 +9,7 @@ from core import lock_file_manager as lfm
 class PluginInstaller:
     def __init__(
         self,
-        plugins_config: List[Dict[str, Any]],
+        plugins_config: list[dict[str, Any]],
         plugins_dir: str,
         tmux_conf_path: str,
     ) -> None:
@@ -28,7 +28,7 @@ class PluginInstaller:
             else:
                 print(f"Failed to install {plugin.get('name')}")
 
-    def _install_git_plugin(self, plugin: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def _install_git_plugin(self, plugin: dict[str, Any]) -> tuple[bool, str | None]:
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
 
         if os.path.exists(plugin_path):
@@ -79,9 +79,9 @@ class PluginInstaller:
 
     def _install_git_plugin_with_progress(
         self,
-        plugin: Dict[str, Any],
-        progress_callback: Optional[Callable[[int], None]] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        plugin: dict[str, Any],
+        progress_callback: Callable[[int], None] | None = None,
+    ) -> tuple[bool, str | None]:
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
 
         if os.path.exists(plugin_path):
@@ -152,7 +152,7 @@ class PluginInstaller:
 
         return True, used_tag or None
 
-    def _get_latest_tag(self, plugin_path: str) -> Optional[str]:
+    def _get_latest_tag(self, plugin_path: str) -> str | None:
         try:
             result = subprocess.run(
                 ["git", "tag", "--sort=-creatordate"],
@@ -172,16 +172,14 @@ class PluginInstaller:
         except subprocess.CalledProcessError:
             return None
 
-    def _update_lock_file(
-        self, plugin: Dict[str, Any], used_tag: Optional[str]
-    ) -> None:
-        sources: List[str] = []
+    def _update_lock_file(self, plugin: dict[str, Any], used_tag: str | None) -> None:
+        sources: list[str] = []
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
 
         for source in plugin.get("source", []):
             sources.append(os.path.join(plugin_path, source))
 
-        plugin_data: Dict[str, Any] = {
+        plugin_data: dict[str, Any] = {
             "name": plugin["name"],
             "sources": sources,
             "enabled": plugin.get("enabled", True),
@@ -205,7 +203,7 @@ class PluginInstaller:
 
         lfm.write_lock_file(lock_data)
 
-    def _get_commit_hash(self, plugin: Dict[str, Any]) -> Optional[str]:
+    def _get_commit_hash(self, plugin: dict[str, Any]) -> str | None:
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
 
         try:
@@ -221,4 +219,4 @@ class PluginInstaller:
             return None
 
     def _get_current_timestamp(self) -> str:
-        return str(datetime.datetime.utcnow())
+        return str(datetime.now(timezone.utc))

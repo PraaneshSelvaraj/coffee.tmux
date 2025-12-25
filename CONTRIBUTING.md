@@ -13,7 +13,7 @@ cd coffee.tmux
 
 2. **Set up your development environment:**
 
-- Install Python 3.8 or higher.
+- Install Python 3.10 or higher.
 - Install dependencies:
 
   ```bash
@@ -31,6 +31,21 @@ git checkout -b feature/your-feature-name
 ## Code quality
 
 We maintain high code quality standards using automated tools. Please ensure your code passes all checks:
+
+### PEP Standards
+
+This project follows the official Python Enhancement Proposal (PEP) guidelines for style and type hints.
+
+- **PEP 8 – Style Guide for Python Code**  
+  Write clear, consistent, and readable code by following the PEP 8 conventions for naming, layout, imports, and formatting.
+
+- **PEP 484 – Type Hints**  
+  Use type hints for all function parameters and return values to improve correctness, readability, and tooling support.
+
+- **PEP 585 & PEP 604 – Modern Type Syntax**  
+  Prefer modern built‑in generics (for example, `list[str]`, `dict[str, int]`) and the union operator (`str | None`) where supported by Python 3.10+.
+
+All new and updated code is expected to comply with these PEPs, and the formatting and type‑checking tools configured in this repository will enforce them.
 
 ### Code Formatting
 

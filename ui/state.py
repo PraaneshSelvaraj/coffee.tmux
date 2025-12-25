@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from rich.console import Console
 
@@ -13,17 +13,17 @@ class AppState:
         self.current_tab: str = "Home"
         self.mode: str = "normal"
         self.update_selected: int = 0
-        self.update_data: List[Dict[str, Any]] = []
-        self.update_progress: Dict[str, int] = {}
+        self.update_data: list[dict[str, Any]] = []
+        self.update_progress: dict[str, int] = {}
         self.checking_updates: bool = False
         self.remove_selected: int = 0
-        self.marked_for_removal: Set[str] = set()
-        self.removing_progress: Dict[str, int] = {}
-        self.remove_data: List[Dict[str, Any]] = []
-        self._app_ref: Optional[Any] = None
+        self.marked_for_removal: set[str] = set()
+        self.removing_progress: dict[str, int] = {}
+        self.remove_data: list[dict[str, Any]] = []
+        self._app_ref: Any | None = None
         self.install_selected: int = 0
-        self.install_data: List[Dict[str, Any]] = []
-        self.installing_progress: Dict[str, int] = {}
+        self.install_data: list[dict[str, Any]] = []
+        self.installing_progress: dict[str, int] = {}
         self.plugin_remover = plugin_remover
         self.plugin_updater = plugin_updater
 
@@ -39,7 +39,7 @@ class AppState:
         self.remove_data = self.plugin_remover.get_installed_plugins()
 
     def remove_uninstalled_plugins_from_updates(
-        self, uninstalled_plugin_names: List[str]
+        self, uninstalled_plugin_names: list[str]
     ) -> None:
         uninstalled_names_set = set(uninstalled_plugin_names)
         self.update_data = [

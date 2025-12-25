@@ -4,7 +4,7 @@ CLI utility functions
 
 import os
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, List
+from typing import Any
 
 from rich.console import Console
 from rich.progress import (
@@ -101,7 +101,7 @@ def create_progress() -> Progress:
     )
 
 
-def format_plugin_table(plugins: List[dict[str, Any]], title: str = "Plugins") -> Table:
+def format_plugin_table(plugins: list[dict[str, Any]], title: str = "Plugins") -> Table:
     """Format plugins as a rich table"""
     table: Table = Table(
         title=f"[bold {ACCENT_COLOR}]{title}[/]", border_style=ACCENT_COLOR

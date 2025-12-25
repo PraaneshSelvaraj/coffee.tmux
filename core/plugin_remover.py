@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable
 
 from core import lock_file_manager as lfm
 
@@ -12,10 +12,10 @@ class PluginRemover:
 
     def get_installed_plugins(
         self,
-    ) -> List[Dict[str, Union[str, bool, Dict[str, Any]]]]:
+    ) -> list[dict[str, str | bool | dict[str, Any]]]:
         lock_data = lfm.read_lock_file()
         plugins = lock_data.get("plugins", [])
-        installed_plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = []
+        installed_plugins: list[dict[str, str | bool | dict[str, Any]]] = []
 
         for plugin in plugins:
             plugin_name = plugin.get("name", "")
@@ -67,7 +67,7 @@ class PluginRemover:
     def remove_plugin(
         self,
         plugin_name: str,
-        progress_callback: Optional[Callable[[str, int], None]] = None,
+        progress_callback: Callable[[str, int], None] | None = None,
     ) -> bool:
         def send_progress(progress: int) -> None:
             if progress_callback:

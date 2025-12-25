@@ -1,4 +1,5 @@
-from typing import Any, Dict, List
+from datetime import datetime
+from typing import Any
 
 from rich import style
 from rich.box import ROUNDED
@@ -24,7 +25,7 @@ class HomeTab(Tab):
     def __init__(self) -> None:
         super().__init__("Home")
 
-    def get_display_list(self) -> List[Dict[str, Any]]:
+    def get_display_list(self) -> list[dict[str, Any]]:
         lock_file = lfm.read_lock_file()
         plugins = lock_file.get("plugins", [])
         active = sorted(
@@ -34,7 +35,7 @@ class HomeTab(Tab):
             [p for p in plugins if not p.get("enabled")],
             key=lambda x: x["name"].lower(),
         )
-        display_list: List[Dict[str, Any]] = []
+        display_list: list[dict[str, Any]] = []
         if active:
             display_list.append({"type": "header", "text": "Active Plugins"})
             display_list.extend([{"type": "plugin", "data": p} for p in active])
@@ -126,8 +127,6 @@ class HomeTab(Tab):
             last_pull = git_info.get("last_pull", "")
             if last_pull:
                 try:
-                    from datetime import datetime
-
                     dt = datetime.fromisoformat(last_pull.replace("Z", "+00:00"))
                     days_ago = (datetime.now() - dt).days
                     age_text = "Today" if days_ago == 0 else f"{days_ago}d ago"
@@ -155,7 +154,7 @@ class HomeTab(Tab):
     def create_home_panel(self, app_state: Any) -> Layout:
         plugin_list_panel = Panel(
             self.display_installed_plugins(app_state),
-            title="Plugin List",
+            title="Plugin list",
             border_style=ACCENT_COLOR,
             box=ROUNDED,
             style=BACKGROUND_STYLE,

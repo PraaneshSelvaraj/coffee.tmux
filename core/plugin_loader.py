@@ -1,29 +1,29 @@
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import yaml
 
 
 class PluginLoader:
     def __init__(self, path: str) -> None:
-        self.COFFEE_PLUGINS_LIST_DIR: str = path
+        self.coffee_plugins_list_dir: str = path
 
-    def load_plugins(self) -> List[Dict[str, Any]]:
-        plugin_configs: List[Dict[str, Any]] = []
+    def load_plugins(self) -> list[dict[str, Any]]:
+        plugin_configs: list[dict[str, Any]] = []
 
-        if not os.path.exists(self.COFFEE_PLUGINS_LIST_DIR):
+        if not os.path.exists(self.coffee_plugins_list_dir):
             raise FileNotFoundError(
-                f"The plugin directory '{self.COFFEE_PLUGINS_LIST_DIR}' doesn't exist."
+                f"The plugin directory '{self.coffee_plugins_list_dir}' doesn't exist."
             )
 
-        for file in os.listdir(self.COFFEE_PLUGINS_LIST_DIR):
+        for file in os.listdir(self.coffee_plugins_list_dir):
             if file.endswith(".yaml") or file.endswith(".yml"):
-                file_path = os.path.join(self.COFFEE_PLUGINS_LIST_DIR, file)
+                file_path = os.path.join(self.coffee_plugins_list_dir, file)
                 try:
                     with open(file_path, "r") as f:
                         data = yaml.safe_load(f)
                         if data:
-                            plugin_data: Dict[str, Any] = {
+                            plugin_data: dict[str, Any] = {
                                 "name": data.get("name", ""),
                                 "url": data.get("url", ""),
                                 "local": data.get("local", False),

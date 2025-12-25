@@ -2,7 +2,7 @@
 Update command implementation
 """
 
-from typing import Any, List
+from typing import Any
 
 from core import PluginUpdater
 
@@ -26,7 +26,7 @@ def run(args: Args) -> int:
         if not args.quiet:
             print_info("Checking for plugin updates...")
         updater = PluginUpdater(COFFEE_PLUGINS_DIR)
-        updates: List[dict[str, Any]] = updater.check_for_updates()
+        updates: list[dict[str, Any]] = updater.check_for_updates()
 
         if not updates:
             if not args.quiet:

@@ -1,13 +1,13 @@
 import json
 import os
-from typing import Any, Dict, TypedDict
+from typing import Any, TypedDict
 
 COFFEE_DIR: str = os.path.expanduser("~/.tmux/coffee")
 LOCK_FILE_PATH: str = os.path.join(COFFEE_DIR, "caffeine-lock.json")
 
 
 class LockData(TypedDict):
-    plugins: list[Dict[str, Any]]
+    plugins: list[dict[str, Any]]
 
 
 def read_lock_file() -> LockData:

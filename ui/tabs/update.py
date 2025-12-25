@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from rich.box import ROUNDED
 from rich.layout import Layout
@@ -20,7 +20,7 @@ class UpdateTab(Tab):
     def __init__(self) -> None:
         super().__init__("Update")
 
-    def _get_updates_with_updates(self, app_state: Any) -> List[Dict[str, Any]]:
+    def _get_updates_with_updates(self, app_state: Any) -> list[dict[str, Any]]:
         return [
             p
             for p in app_state.update_data

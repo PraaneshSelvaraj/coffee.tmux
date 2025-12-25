@@ -11,11 +11,11 @@ Modules:
 """
 
 from . import lock_file_manager
-from .pluginInstaller import PluginInstaller
-from .pluginLoader import PluginLoader
-from .pluginRemover import PluginRemover
-from .pluginSourcer import PluginSourcer
-from .pluginUpdater import PluginUpdater
+from .plugin_installer import PluginInstaller
+from .plugin_loader import PluginLoader
+from .plugin_remover import PluginRemover
+from .plugin_sourcer import PluginSourcer
+from .plugin_updater import PluginUpdater
 
 __all__ = [
     "PluginSourcer",

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from rich.box import ROUNDED
 from rich.layout import Layout
@@ -24,7 +24,7 @@ class InstallTab(Tab):
     def __init__(self) -> None:
         super().__init__("Install")
 
-    def _get_installable_plugins(self, app_state: Any) -> List[Dict[str, Any]]:
+    def _get_installable_plugins(self, app_state: Any) -> list[dict[str, Any]]:
         plugin_loader = PluginLoader(COFFEE_PLUGINS_LIST_DIR)
         config_plugins = plugin_loader.load_plugins()
         lock_data = lfm.read_lock_file()

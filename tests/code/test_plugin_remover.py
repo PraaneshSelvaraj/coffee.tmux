@@ -1,13 +1,13 @@
-from typing import Any, Dict, List, Union
+from typing import Any
 from unittest.mock import MagicMock, patch
 
-import core.pluginRemover as pr
+from core import PluginRemover
 
 
 def test_get_installed_plugins_empty() -> None:
     with patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []}):
-        remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
-        plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = (
+        remover: PluginRemover = PluginRemover("/fake/path")
+        plugins: list[dict[str, str | bool | dict[str, Any]]] = (
             remover.get_installed_plugins()
         )
         assert len(plugins) == 0
@@ -34,8 +34,8 @@ def test_get_installed_plugins_with_size(
     }
     mock_run.return_value = MagicMock(returncode=0, stdout="5.2M\t/path\n")
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
-    plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = (
+    remover: PluginRemover = PluginRemover("/fake/path")
+    plugins: list[dict[str, str | bool | dict[str, Any]]] = (
         remover.get_installed_plugins()
     )
 
@@ -62,8 +62,8 @@ def test_get_installed_plugins_path_not_exists(
         ]
     }
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
-    plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = (
+    remover: PluginRemover = PluginRemover("/fake/path")
+    plugins: list[dict[str, str | bool | dict[str, Any]]] = (
         remover.get_installed_plugins()
     )
 
@@ -90,8 +90,8 @@ def test_get_installed_plugins_du_command_fails(
         ]
     }
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
-    plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = (
+    remover: PluginRemover = PluginRemover("/fake/path")
+    plugins: list[dict[str, str | bool | dict[str, Any]]] = (
         remover.get_installed_plugins()
     )
 
@@ -116,7 +116,7 @@ def test_remove_plugin_success(
         ]
     }
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("plugin1")
 
     assert result is True
@@ -133,7 +133,7 @@ def test_remove_plugin_success(
 def test_remove_plugin_not_found(mock_read: MagicMock) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1", "enabled": True}]}
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("nonexistent-plugin")
 
     assert result is False
@@ -147,7 +147,7 @@ def test_remove_plugin_rmtree_fails(
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1", "enabled": True}]}
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("plugin1")
 
     assert result is False
@@ -161,7 +161,7 @@ def test_remove_plugin_path_not_exists(
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1", "enabled": True}]}
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("plugin1")
 
     # Should still succeed and update lock file even if directory doesn't exist
@@ -181,12 +181,12 @@ def test_remove_plugin_with_progress_callback(
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1", "enabled": True}]}
 
-    progress_calls: List[tuple[str, int]] = []
+    progress_calls: list[tuple[str, int]] = []
 
     def progress_callback(name: str, progress: int) -> None:
         progress_calls.append((name, progress))
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("plugin1", progress_callback=progress_callback)
 
     assert result is True
@@ -203,12 +203,12 @@ def test_remove_plugin_with_progress_callback_failure(
 ) -> None:
     mock_read.return_value = {"plugins": []}
 
-    progress_calls: List[tuple[str, int]] = []
+    progress_calls: list[tuple[str, int]] = []
 
     def progress_callback(name: str, progress: int) -> None:
         progress_calls.append((name, progress))
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin(
         "nonexistent", progress_callback=progress_callback
     )
@@ -220,12 +220,12 @@ def test_remove_plugin_with_progress_callback_failure(
 
 @patch("core.lock_file_manager.read_lock_file", side_effect=Exception("Read error"))
 def test_remove_plugin_exception_handling(mock_read: MagicMock) -> None:
-    progress_calls: List[tuple[str, int]] = []
+    progress_calls: list[tuple[str, int]] = []
 
     def progress_callback(name: str, progress: int) -> None:
         progress_calls.append((name, progress))
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
+    remover: PluginRemover = PluginRemover("/fake/path")
     result: bool = remover.remove_plugin("plugin1", progress_callback=progress_callback)
 
     assert result is False
@@ -253,8 +253,8 @@ def test_get_installed_plugins_version_from_commit_hash(
     }
     mock_run.return_value = MagicMock(returncode=0, stdout="3.5M\t/path\n")
 
-    remover: pr.PluginRemover = pr.PluginRemover("/fake/path")
-    plugins: List[Dict[str, Union[str, bool, Dict[str, Any]]]] = (
+    remover: PluginRemover = PluginRemover("/fake/path")
+    plugins: list[dict[str, str | bool | dict[str, Any]]] = (
         remover.get_installed_plugins()
     )
 

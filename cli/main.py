@@ -5,7 +5,7 @@ Coffee CLI - Main entry point
 import argparse
 import os
 import sys
-from typing import Any, Optional
+import traceback
 
 # Add current directory to Python path
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -116,7 +116,7 @@ Examples:
 def main() -> int:
     """Main CLI entry point"""
     parser = create_parser()
-    args: Any = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # Handle global flags
     if getattr(args, "version", False):
@@ -140,8 +140,6 @@ def main() -> int:
             return 1
         except Exception as e:
             if getattr(args, "verbose", False):
-                import traceback
-
                 traceback.print_exc()
             else:
                 print(f"Error: {e}")

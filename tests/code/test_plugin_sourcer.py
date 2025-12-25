@@ -1,23 +1,23 @@
 import subprocess
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock, patch
 
-import core.pluginSourcer as ps
+from core import PluginSourcer
 
 
 @patch("core.lock_file_manager.read_lock_file")
-@patch.object(ps.PluginSourcer, "_source_plugin")
+@patch.object(PluginSourcer, "_source_plugin")
 def test_source_enabled_plugins_empty(
     mock_source: MagicMock, mock_read: MagicMock
 ) -> None:
     mock_read.return_value = {"plugins": []}
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.source_enabled_plugins()
     mock_source.assert_not_called()
 
 
 @patch("core.lock_file_manager.read_lock_file")
-@patch.object(ps.PluginSourcer, "_source_plugin")
+@patch.object(PluginSourcer, "_source_plugin")
 def test_source_enabled_plugins_only_enabled(
     mock_source: MagicMock, mock_read: MagicMock
 ) -> None:
@@ -28,11 +28,11 @@ def test_source_enabled_plugins_only_enabled(
             {"name": "plugin3", "enabled": True, "sources": ["/path/script3.tmux"]},
         ]
     }
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.source_enabled_plugins()
 
     assert mock_source.call_count == 2
-    sourced_plugins: List[str] = [
+    sourced_plugins: list[str] = [
         call_args[0][0]["name"] for call_args in mock_source.call_args_list
     ]
     assert "plugin1" in sourced_plugins
@@ -40,14 +40,14 @@ def test_source_enabled_plugins_only_enabled(
     assert "plugin2" not in sourced_plugins
 
 
-@patch.object(ps.PluginSourcer, "_run_plugin_script")
+@patch.object(PluginSourcer, "_run_plugin_script")
 def test_source_plugin_with_scripts(mock_run: MagicMock, capsys: Any) -> None:
-    plugin: Dict[str, Any] = {
+    plugin: dict[str, Any] = {
         "name": "test-plugin",
         "enabled": True,
         "sources": ["/path/to/script1.tmux", "/path/to/script2.tmux"],
     }
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._source_plugin(plugin)
 
     assert mock_run.call_count == 2
@@ -59,8 +59,8 @@ def test_source_plugin_with_scripts(mock_run: MagicMock, capsys: Any) -> None:
 
 
 def test_source_plugin_no_scripts(capsys: Any) -> None:
-    plugin: Dict[str, Any] = {"name": "test-plugin", "enabled": True, "sources": []}
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    plugin: dict[str, Any] = {"name": "test-plugin", "enabled": True, "sources": []}
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._source_plugin(plugin)
 
     captured = capsys.readouterr()
@@ -68,13 +68,13 @@ def test_source_plugin_no_scripts(capsys: Any) -> None:
 
 
 def test_source_plugin_disabled_plugin() -> None:
-    plugin: Dict[str, Any] = {
+    plugin: dict[str, Any] = {
         "name": "test-plugin",
         "enabled": False,
         "sources": ["/path/to/script.tmux"],
     }
-    with patch.object(ps.PluginSourcer, "_run_plugin_script") as mock_run:
-        sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    with patch.object(PluginSourcer, "_run_plugin_script") as mock_run:
+        sourcer: PluginSourcer = PluginSourcer()
         sourcer._source_plugin(plugin)
         mock_run.assert_not_called()
 
@@ -82,7 +82,7 @@ def test_source_plugin_disabled_plugin() -> None:
 @patch("subprocess.run")
 def test_run_plugin_script_success(mock_run: MagicMock, capsys: Any) -> None:
     mock_run.return_value = MagicMock()
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._run_plugin_script("/path/to/script.tmux")
 
     mock_run.assert_called_once_with(
@@ -94,7 +94,7 @@ def test_run_plugin_script_success(mock_run: MagicMock, capsys: Any) -> None:
 
 @patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "cmd"))
 def test_run_plugin_script_failure(mock_run: MagicMock, capsys: Any) -> None:
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._run_plugin_script("/path/to/script.tmux")
 
     captured = capsys.readouterr()
@@ -113,11 +113,11 @@ def test_set_plugin_enabled_true(
         ]
     }
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._set_plugin_enabled("plugin1", True)
 
     mock_write.assert_called_once()
-    written_data: Dict[str, Any] = mock_write.call_args[0][0]
+    written_data: dict[str, Any] = mock_write.call_args[0][0]
     plugin1 = next(p for p in written_data["plugins"] if p["name"] == "plugin1")
     assert plugin1["enabled"] is True
 
@@ -137,11 +137,11 @@ def test_set_plugin_enabled_false(
         ]
     }
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._set_plugin_enabled("plugin1", False)
 
     mock_write.assert_called_once()
-    written_data: Dict[str, Any] = mock_write.call_args[0][0]
+    written_data: dict[str, Any] = mock_write.call_args[0][0]
     plugin1 = next(p for p in written_data["plugins"] if p["name"] == "plugin1")
     assert plugin1["enabled"] is False
 
@@ -156,7 +156,7 @@ def test_set_plugin_enabled_not_found(
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1", "enabled": True}]}
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer._set_plugin_enabled("nonexistent", True)
 
     mock_write.assert_not_called()
@@ -164,19 +164,19 @@ def test_set_plugin_enabled_not_found(
     assert "Plugin 'nonexistent' not found in the lock file" in captured.out
 
 
-@patch.object(ps.PluginSourcer, "source_enabled_plugins")
-@patch.object(ps.PluginSourcer, "_set_plugin_enabled")
+@patch.object(PluginSourcer, "source_enabled_plugins")
+@patch.object(PluginSourcer, "_set_plugin_enabled")
 def test_activate_plugin(mock_set: MagicMock, mock_source: MagicMock) -> None:
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.activate_plugin("test-plugin")
 
     mock_set.assert_called_once_with("test-plugin", True)
     mock_source.assert_called_once()
 
 
-@patch.object(ps.PluginSourcer, "_set_plugin_enabled")
+@patch.object(PluginSourcer, "_set_plugin_enabled")
 def test_deactivate_plugin(mock_set: MagicMock) -> None:
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.deactivate_plugin("test-plugin")
 
     mock_set.assert_called_once_with("test-plugin", False)
@@ -184,7 +184,7 @@ def test_deactivate_plugin(mock_set: MagicMock) -> None:
 
 @patch("core.lock_file_manager.write_lock_file")
 @patch("core.lock_file_manager.read_lock_file")
-@patch.object(ps.PluginSourcer, "source_enabled_plugins")
+@patch.object(PluginSourcer, "source_enabled_plugins")
 def test_activate_plugin_integration(
     mock_source: MagicMock, mock_read: MagicMock, mock_write: MagicMock, capsys: Any
 ) -> None:
@@ -194,11 +194,11 @@ def test_activate_plugin_integration(
         ]
     }
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.activate_plugin("my-plugin")
 
     # Check that plugin was enabled
-    written_data: Dict[str, Any] = mock_write.call_args[0][0]
+    written_data: dict[str, Any] = mock_write.call_args[0][0]
     assert written_data["plugins"][0]["enabled"] is True
 
     # Check that source_enabled_plugins was called
@@ -219,11 +219,11 @@ def test_deactivate_plugin_integration(
         ]
     }
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.deactivate_plugin("my-plugin")
 
     # Check that plugin was disabled
-    written_data: Dict[str, Any] = mock_write.call_args[0][0]
+    written_data: dict[str, Any] = mock_write.call_args[0][0]
     assert written_data["plugins"][0]["enabled"] is False
 
     captured = capsys.readouterr()
@@ -231,7 +231,7 @@ def test_deactivate_plugin_integration(
 
 
 @patch("core.lock_file_manager.read_lock_file")
-@patch.object(ps.PluginSourcer, "_run_plugin_script")
+@patch.object(PluginSourcer, "_run_plugin_script")
 def test_source_enabled_plugins_multiple_scripts_per_plugin(
     mock_run: MagicMock, mock_read: MagicMock, capsys: Any
 ) -> None:
@@ -249,7 +249,7 @@ def test_source_enabled_plugins_multiple_scripts_per_plugin(
         ]
     }
 
-    sourcer: ps.PluginSourcer = ps.PluginSourcer()
+    sourcer: PluginSourcer = PluginSourcer()
     sourcer.source_enabled_plugins()
 
     assert mock_run.call_count == 3

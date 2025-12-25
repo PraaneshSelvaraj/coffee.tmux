@@ -18,7 +18,6 @@ class Args:
 def run(args: Args) -> int:
     """Run disable command"""
     try:
-
         # Check current state first
         lock_data: lfm.LockData = lfm.read_lock_file()
         plugins: list[dict[str, Any]] = lock_data.get("plugins", [])
@@ -27,7 +26,7 @@ def run(args: Args) -> int:
         for plugin in plugins:
             if plugin.get("name") == args.plugin:
                 plugin_found = True
-                current_state = plugin.get("enabled", True)  # Default to True
+                current_state = plugin.get("enabled", True)
                 break
         if not plugin_found:
             print_error(f"Plugin '{args.plugin}' is not installed")

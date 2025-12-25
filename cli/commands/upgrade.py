@@ -2,7 +2,7 @@
 Upgrade command implementation
 """
 
-from typing import Any, List, Optional
+from typing import Any
 
 from rich.progress import TaskID
 
@@ -20,7 +20,7 @@ from ..utils import (
 
 
 class Args:
-    plugin: Optional[str]
+    plugin: str | None
     quiet: bool
 
 
@@ -28,7 +28,7 @@ def run(args: Args) -> int:
     """Run upgrade command"""
     try:
         updater = PluginUpdater(COFFEE_PLUGINS_DIR)
-        updates: List[dict[str, Any]] = updater.check_for_updates()
+        updates: list[dict[str, Any]] = updater.check_for_updates()
 
         # Filter plugins with available updates
         available_updates = [
