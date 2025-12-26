@@ -19,8 +19,17 @@ def read_lock_file() -> LockData:
 
 
 def write_lock_file(data: LockData) -> None:
+    temp_file = LOCK_FILE_PATH + ".tmp"
     try:
-        with open(LOCK_FILE_PATH, "w") as f:
+        with open(temp_file, "w") as f:
             json.dump(data, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, LOCK_FILE_PATH)
     except Exception as e:
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
         print(f"Error writing lock file: {e}")
