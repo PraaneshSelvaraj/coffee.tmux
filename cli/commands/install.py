@@ -3,7 +3,7 @@ Install command implementation
 """
 
 import os
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from rich.progress import TaskID
 
@@ -18,7 +18,6 @@ from ..utils import (
     create_progress,
     print_error,
     print_info,
-    print_success,
 )
 
 
@@ -82,10 +81,10 @@ def run(args: Args) -> int:
         if args.quiet:
             # Quiet mode - no progress bars
             for plugin in plugins_to_install:
-                success, used_tag = installer._install_git_plugin(plugin)
-                if success:
-                    installer._update_lock_file(plugin, used_tag)
-                else:
+                success, used_tag = installer.install_git_plugin(
+                    plugin, force=args.force
+                )
+                if not success:
                     print_error(f"Failed to install {plugin['name']}")
                     return 1
         else:
@@ -100,12 +99,11 @@ def run(args: Args) -> int:
                     def callback(percent: int, task_id: TaskID = task_id) -> None:
                         progress.update(task_id, completed=percent)
 
-                    success, used_tag = installer._install_git_plugin_with_progress(
-                        plugin, callback
+                    success, used_tag = installer.install_git_plugin(
+                        plugin, callback, force=args.force
                     )
 
                     if success:
-                        installer._update_lock_file(plugin, used_tag)
                         progress.update(task_id, completed=100)
                         console.print(
                             f"[bold {HIGHLIGHT_COLOR}]SUCCESS[/] Installed {plugin['name']} @ [bold white]{used_tag or 'latest'}[/]"

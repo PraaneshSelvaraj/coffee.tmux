@@ -189,11 +189,12 @@ class PluginManagerApp(App):
                 def progress_callback(progress: int) -> None:
                     self.app_state.install_progress_callback(plugin_name, progress)
 
-                success, used_tag = installer._install_git_plugin_with_progress(
-                    config, progress_callback
+                success, _ = installer.install_git_plugin(
+                    config,
+                    progress_callback,
+                    force=False,
                 )
                 if success:
-                    installer._update_lock_file(config, used_tag)
                     self.app_state.install_progress_callback(plugin_name, 100)
                     console.log(f"[green]Successfully installed {plugin_name}[/green]")
                     installed_plugins.append(plugin_name)
