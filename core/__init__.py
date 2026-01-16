@@ -6,7 +6,8 @@ Modules:
 - pluginInstaller: Handles the installation of plugins.
 - pluginLoader: Manages loading of plugins.
 - pluginSourcer: Handles sourcing and configuration.
-- pluginUpdater: Manages plugin updates.
+- pluginUpdater: Checks for plugin updates.
+- pluginUpgrader: Updates the plugins
 - pluginRemover: Manages plugin removals.
 """
 
@@ -16,12 +17,14 @@ from .plugin_loader import PluginLoader
 from .plugin_remover import PluginRemover
 from .plugin_sourcer import PluginSourcer
 from .plugin_updater import PluginUpdater
+from .plugin_upgrader import PluginUpgrader
 
 __all__ = [
     "PluginSourcer",
     "PluginInstaller",
     "PluginRemover",
     "PluginUpdater",
+    "PluginUpgrader",
     "PluginLoader",
     "lock_file_manager",
 ]

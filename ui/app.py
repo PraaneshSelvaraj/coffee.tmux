@@ -7,7 +7,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
-from core import PluginInstaller
+from core import PluginInstaller, PluginRemover, PluginUpdater, PluginUpgrader
 
 from .constants import PLUGINS_DIR, VISIBLE_ROWS
 from .state import AppState
@@ -49,9 +49,15 @@ class PluginManagerApp(App):
         Binding("ctrl+a", "install_all", "Install All", show=False),
     ]
 
-    def __init__(self, plugin_updater: Any, plugin_remover: Any) -> None:
+    def __init__(
+        self,
+        plugin_updater: PluginUpdater,
+        plugin_upgrader: PluginUpgrader,
+        plugin_remover: PluginRemover,
+    ) -> None:
         super().__init__()
         self.plugin_updater = plugin_updater
+        self.plugin_upgrader = plugin_upgrader
         self.plugin_remover = plugin_remover
         self.app_state = AppState(plugin_updater, plugin_remover)
         self.app_state.bind_app(self)
@@ -257,14 +263,21 @@ class PluginManagerApp(App):
         self.rich_display.refresh()
 
     @work(exclusive=True, thread=True)
-    def update_plugins_in_background(self, plugins_to_update: list[dict]) -> None:
+    def upgrade_plugins_in_background(self, plugins_to_update: list[dict]) -> None:
         try:
             for plugin in plugins_to_update:
                 plugin_name = plugin["name"]
                 console.log(f"Starting update for {plugin_name}")
-                success = self.plugin_updater.update_plugin(
-                    plugin, progress_callback=self.app_state.update_progress_callback
+
+                plugin_name = plugin["name"]
+
+                def progress_cb(progress: int) -> None:
+                    self.app_state.update_progress_callback(plugin_name, progress)
+
+                success = self.plugin_upgrader.upgrade_plugin(
+                    plugin, progress_callback=progress_cb
                 )
+
                 if success:
                     console.log(f"Successfully updated {plugin_name}")
                     plugin["_internal"]["update_available"] = False
@@ -291,7 +304,7 @@ class PluginManagerApp(App):
                 for plugin in marked_plugins:
                     plugin["progress"] = 0
                     self.app_state.update_progress[plugin["name"]] = 0
-                self.update_plugins_in_background(marked_plugins)
+                self.upgrade_plugins_in_background(marked_plugins)
                 self.notify(f"Updating {len(marked_plugins)} marked plugin(s)...")
             else:
                 self.notify("No plugins marked for update.")
@@ -305,7 +318,7 @@ class PluginManagerApp(App):
                     plugin["progress"] = 0
                     self.app_state.update_progress[plugin["name"]] = 0
                     plugin["marked"] = True
-                self.update_plugins_in_background(updates_with_updates)
+                self.upgrade_plugins_in_background(updates_with_updates)
                 self.notify(f"Updating all {len(updates_with_updates)} plugin(s)...")
             else:
                 self.notify("No updates available.")

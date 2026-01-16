@@ -6,7 +6,7 @@ from typing import Any
 
 from rich.progress import TaskID
 
-from core import PluginUpdater
+from core import PluginUpdater, PluginUpgrader
 
 from ..utils import (
     COFFEE_PLUGINS_DIR,
@@ -63,12 +63,13 @@ def run(args: Args) -> int:
         if not args.quiet:
             print_info(f"Upgrading {len(available_updates)} plugin(s)...")
 
+        upgrader = PluginUpgrader()
         success_count = 0
 
         if args.quiet:
             # Quiet mode - no progress bars
             for update in available_updates:
-                success = updater.update_plugin(update)
+                success = upgrader.upgrade_plugin(update)
                 if success:
                     success_count += 1
         else:
@@ -80,12 +81,13 @@ def run(args: Args) -> int:
                     )
 
                     # Callback for progress update
-                    def callback(
-                        plugin_name: str, percent: int, task_id: TaskID = task_id
-                    ) -> None:
+                    def callback(percent: int, task_id: TaskID = task_id) -> None:
                         progress.update(task_id, completed=percent)
 
-                    success = updater.update_plugin(update, callback)
+                    success = upgrader.upgrade_plugin(
+                        update, progress_callback=callback
+                    )
+
                     if success:
                         success_count += 1
                         progress.update(task_id, completed=100)
