@@ -2,7 +2,7 @@
 Remove command implementation
 """
 
-from typing import Callable, Optional
+from typing import Optional
 
 from rich.progress import TaskID
 
@@ -16,7 +16,6 @@ from ..utils import (
     create_progress,
     print_error,
     print_info,
-    print_success,
 )
 
 

@@ -2,6 +2,7 @@
 """
 Coffee CLI - Main entry point
 """
+
 import argparse
 import os
 import sys

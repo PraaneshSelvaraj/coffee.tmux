@@ -2,6 +2,7 @@
 """
 Coffee TUI entry point for tmux popup
 """
+
 import os
 import sys
 
