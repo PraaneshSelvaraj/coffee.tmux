@@ -169,3 +169,70 @@ def test_progress_callback_called(
     assert success is True
     assert progress
     assert progress[-1] == 100
+
+
+@patch("core.lock_file_manager.write_lock_file")
+@patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []})
+@patch("subprocess.run")
+@patch("os.walk")
+def test_install_discovers_tmux_sources_when_not_provided(
+    mock_walk: MagicMock,
+    mock_run: MagicMock,
+    mock_read: MagicMock,
+    mock_write: MagicMock,
+) -> None:
+    mock_run.return_value = MagicMock()
+
+    mock_walk.return_value = [
+        ("/plugins/dir/foo", [], ["init.tmux", "extra.tmux", "README.md"]),
+        ("/plugins/dir/foo/sub", [], ["nested.tmux"]),
+    ]
+
+    installer = make_installer_with_plugins()
+
+    success, _ = installer.install_git_plugin({"name": "foo", "url": "owner/repo"})
+
+    assert success is True
+    mock_write.assert_called_once()
+
+    written_lock = mock_write.call_args[0][0]
+    plugin = written_lock["plugins"][0]
+
+    assert sorted(plugin["source"]) == sorted(
+        [
+            "/plugins/dir/foo/init.tmux",
+            "/plugins/dir/foo/extra.tmux",
+            "/plugins/dir/foo/sub/nested.tmux",
+        ]
+    )
+
+
+@patch("core.lock_file_manager.write_lock_file")
+@patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []})
+@patch("subprocess.run")
+@patch("os.walk")
+def test_install_respects_explicit_source_and_skips_discovery(
+    mock_walk: MagicMock,
+    mock_run: MagicMock,
+    mock_read: MagicMock,
+    mock_write: MagicMock,
+) -> None:
+    mock_run.return_value = MagicMock()
+
+    installer = make_installer_with_plugins()
+
+    success, _ = installer.install_git_plugin(
+        {
+            "name": "foo",
+            "url": "owner/repo",
+            "source": ["plugin.tmux"],
+        }
+    )
+
+    assert success is True
+    mock_walk.assert_not_called()
+
+    written_lock = mock_write.call_args[0][0]
+    plugin = written_lock["plugins"][0]
+
+    assert plugin["source"] == ["/plugins/dir/foo/plugin.tmux"]

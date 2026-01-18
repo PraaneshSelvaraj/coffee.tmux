@@ -168,16 +168,29 @@ class PluginInstaller:
         except subprocess.CalledProcessError:
             return None
 
+    def _discover_tmux_sources(self, plugin_path: str) -> list[str]:
+        sources: list[str] = []
+
+        for root, _, files in os.walk(plugin_path):
+            for file in files:
+                if file.endswith(".tmux"):
+                    sources.append(os.path.join(root, file))
+
+        return sorted(sources)
+
     def _update_lock_file(self, plugin: dict[str, Any], used_tag: str | None) -> None:
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
 
-        sources = [
-            os.path.join(plugin_path, source) for source in plugin.get("source", [])
-        ]
+        if plugin.get("source"):
+            sources = [
+                os.path.join(plugin_path, source) for source in plugin.get("source", [])
+            ]
+        else:
+            sources = self._discover_tmux_sources(plugin_path)
 
         plugin_data: dict[str, Any] = {
             "name": plugin["name"],
-            "sources": sources,
+            "source": sources,
             "enabled": plugin.get("enabled", True),
             "skip_auto_update": plugin.get("skip_auto_update", False),
             "git": {
