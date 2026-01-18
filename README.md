@@ -1,10 +1,16 @@
 # ☕ Coffee - Modern tmux Plugin Manager
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
-Coffee is a modern and intuitive tmux plugin manager with powerful CLI and terminal UI (TUI). It empowers users to easily install, update, enable/disable, and remove tmux plugins with rich progress feedback and asynchronous operations.
+Coffee.tmux is a modern and intuitive tmux plugin manager with powerful CLI and terminal UI (TUI). It empowers users to easily install, update, enable/disable, and remove tmux plugins with rich progress feedback and asynchronous operations.
 
-![Coffee TUI Home](screenshots/coffee-home.png "Coffee TUI Home Tab")
+![Coffee.tmux TUI Home](screenshots/coffee-home.png "Coffee TUI Home Tab")
+
+## Why Coffee.tmux?
+
+If you’ve used TPM, you know how useful it is, but also how easily `.tmux.conf` can turn into a long, messy file.
+
+Coffee.tmux keeps the same git-native simplicity and adds clean YAML configuration, a proper CLI, and a modern TUI, so managing tmux plugins stays natural and fast.
 
 ## Features
 
@@ -17,9 +23,8 @@ Coffee is a modern and intuitive tmux plugin manager with powerful CLI and termi
 ### 📦 Smart Plugin Management
 
 - YAML-based configuration - cleaner than .tmux.conf declarations
-- Automatic dependency resolution and conflict detection
 - Version locking with rollback capabilities via lock files
-- Selective updates - control which plugins auto-update
+- Selective updates - choose which plugins to update
 
 ### ⚡ Performance & Reliability
 
@@ -32,8 +37,8 @@ Coffee is a modern and intuitive tmux plugin manager with powerful CLI and termi
 
 ### Prerequisites
 
-- tmux >= 3.0
-- Python 3.8+
+- tmux 3.0+
+- Python 3.10+
 - git
 
 ### Clone & Setup
@@ -76,6 +81,48 @@ coffee install
 
 This installs all plugins configured in your YAML files.
 
+## Plugin Configuration
+
+Create YAML files in:
+
+```bash
+~/.config/tmux/coffee/plugins/
+```
+
+Each plugin is defined in its own YAML file.
+
+### Minimal Configuration
+
+This is all you need to install a plugin.
+
+```yaml
+# ~/.config/tmux/coffee/plugins/tmux-resurrect.yaml
+url: "tmux-plugins/tmux-resurrect"
+```
+
+Coffee.tmux automatically detects source files and manages installation and updates.
+
+### Full Configuration
+
+For users who want full control.
+
+```yaml
+# ~/.config/tmux/coffee/plugins/tmux-resurrect.yaml
+name: "tmux-resurrect"
+url: "tmux-plugins/tmux-resurrect"
+tag: "v3.0.0"
+skip_auto_update: false
+source: ["resurrect.tmux"]
+```
+
+Fields:
+
+- `name`: Explicit plugin name
+- `url`: GitHub repo path `<owner>/<repo>` (required)
+- `tag`: Optional GitHub tag
+- `skip_auto_update` : Disable automatic updates (default: false)
+- `source`: List of plugin source script files loaded by tmux
+  
 ## Usage
 
 ### CLI Commands
@@ -94,7 +141,7 @@ coffee disable tmux-sensible # Disable a plugin
 
 ### TUI Interface
 
-Launch the TUI interface via by pressing the keybinding (e.g., `prefix + C`).
+Launch the TUI interface by pressing the keybinding (e.g., `prefix + C`).
 
 Navigate with keys:
 
@@ -105,43 +152,6 @@ Navigate with keys:
 
 Use `j`/`k` or arrow keys to move selections, `Space` to mark/toggle, and follow on-screen controls.
 
-## Plugin Configuration
-
-Create YAML files in:
-
-```bash
-~/.config/tmux/coffee/plugins/
-```
-
-Example configuration:
-
-```yaml
-name: "tmux-resurrect"
-url: "tmux-plugins/tmux-resurrect"
-local: False
-tag: "v3.0.0"
-skip_auto_update: False
-source: ["resurrect.tmux"]
-```
-
-Fields:
-
-- `name`: Plugin name (required)
-- `url`: GitHub repo path `<owner>/<repo>` (required)
-- `local`: Set false for github repos
-- `tag`: Optional tag or branch to check out
-- `skip_auto_update` : Disable automatic updates (default: false)
-- `source`: List of plugin source script files loaded by tmux
-
-## Uninstall Plugins
-
-To uninstall a plugin, remove its YAML configuration file and run:
-
-```bash
-coffee remove <plugin-name>
-```
-
-Alternatively, use the Remove tab in the TUI to uninstall plugins interactively.
 
 ## Contributing
 
