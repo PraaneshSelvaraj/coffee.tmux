@@ -36,9 +36,16 @@ def run(args: Args) -> int:
 
         if not plugins:
             if not args.quiet:
-                print_info(
-                    "No plugins configured. Add YAML files to ~/.config/tmux/coffee/plugins/"
-                )
+                print_info("""No plugins configured
+
+Create a plugin config file, for example:
+[bold]~/.config/tmux/coffee/plugins/tmux-sensible.yaml[/]
+
+Content:
+[bold]url:[/] tmux-plugins/tmux-sensible
+
+Then run:
+[bold]coffee install[/]""")
             return 0
 
         # Filter for specific plugin if requested
