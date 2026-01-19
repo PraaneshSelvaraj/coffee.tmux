@@ -192,6 +192,7 @@ class PluginInstaller:
             "name": plugin["name"],
             "source": sources,
             "enabled": plugin.get("enabled", True),
+            "install_path": plugin_path,
             "skip_auto_update": plugin.get("skip_auto_update", False),
             "git": {
                 "repo": plugin["url"],
