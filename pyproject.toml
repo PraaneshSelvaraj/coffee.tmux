@@ -23,7 +23,8 @@ dependencies = [
   "PyYAML>=6.0.2",
   "rich>=14.1.0", 
   "textual>=6.1.0",
-  "readchar>=4.2.1"
+  "readchar>=4.2.1",
+  "packaging>=25.0"
 ]
 
 [project.urls]
