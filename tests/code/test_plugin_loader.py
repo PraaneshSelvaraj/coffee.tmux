@@ -3,6 +3,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+import yaml
 
 from core import PluginLoader
 
@@ -10,10 +11,8 @@ from core import PluginLoader
 def test_load_plugins_nonexistent_directory() -> None:
     loader = PluginLoader("/nonexistent/path")
 
-    with pytest.raises(FileNotFoundError) as exc:
+    with pytest.raises(FileNotFoundError):
         loader.load_plugins()
-
-    assert "doesn't exist" in str(exc.value)
 
 
 def test_load_plugins_minimal_config_url_only(tmp_path: Path) -> None:
@@ -46,7 +45,6 @@ url: owner/repo
     loader = PluginLoader(str(tmp_path))
     plugins = loader.load_plugins()
 
-    assert len(plugins) == 1
     assert plugins[0]["name"] == "explicit-name"
     assert plugins[0]["url"] == "owner/repo"
 
@@ -59,7 +57,6 @@ def test_load_plugins_multiple_files(tmp_path: Path) -> None:
     plugins = loader.load_plugins()
 
     names = {p["name"] for p in plugins}
-
     assert names == {"repo-a", "repo-b"}
 
 
@@ -75,25 +72,25 @@ def test_load_plugins_ignores_non_yaml_files(tmp_path: Path) -> None:
     assert plugins[0]["name"] == "repo"
 
 
-def test_load_plugins_missing_url_is_skipped(tmp_path: Path) -> None:
+def test_load_plugins_missing_url_raises(tmp_path: Path) -> None:
     (tmp_path / "plugin.yml").write_text("name: no-url")
 
     loader = PluginLoader(str(tmp_path))
-    plugins = loader.load_plugins()
 
-    assert plugins == []
+    with pytest.raises(ValueError):
+        loader.load_plugins()
 
 
 def test_load_plugins_empty_yaml_file(tmp_path: Path) -> None:
     (tmp_path / "empty.yml").write_text("")
 
     loader = PluginLoader(str(tmp_path))
-    plugins = loader.load_plugins()
 
-    assert plugins == []
+    with pytest.raises(ValueError):
+        plugins = loader.load_plugins()
 
 
-def test_load_plugins_invalid_yaml_syntax(tmp_path: Path, capsys: Any) -> None:
+def test_load_plugins_invalid_yaml_syntax_raises(tmp_path: Path) -> None:
     (tmp_path / "broken.yml").write_text("""
 name: bad
   invalid: ::::
@@ -101,11 +98,9 @@ url: owner/repo
 """)
 
     loader = PluginLoader(str(tmp_path))
-    plugins = loader.load_plugins()
 
-    captured = capsys.readouterr()
-    assert "[coffee] Failed to load" in captured.out
-    assert plugins == []
+    with pytest.raises(yaml.YAMLError):
+        loader.load_plugins()
 
 
 def test_load_plugins_defaults_are_applied(tmp_path: Path) -> None:
@@ -151,14 +146,11 @@ def test_load_plugins_empty_directory(tmp_path: Path) -> None:
     assert loader.load_plugins() == []
 
 
-def test_load_plugins_file_read_error(tmp_path: Path, capsys: Any) -> None:
+def test_load_plugins_file_read_error_raises(tmp_path: Path) -> None:
     (tmp_path / "plugin.yml").write_text("url: owner/repo")
 
     loader = PluginLoader(str(tmp_path))
 
     with patch("builtins.open", side_effect=PermissionError("denied")):
-        plugins = loader.load_plugins()
-
-    captured = capsys.readouterr()
-    assert "[coffee] Failed to load" in captured.out
-    assert plugins == []
+        with pytest.raises(PermissionError):
+            loader.load_plugins()

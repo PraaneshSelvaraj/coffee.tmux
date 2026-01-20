@@ -68,7 +68,7 @@ def test_write_lock_file_open_error_raises_and_cleans_up() -> None:
     with (
         patch("core.lock_file_manager._file_lock"),
         patch("core.lock_file_manager.os.makedirs"),
-        patch("builtins.open", side_effect=Exception("Write error")),
+        patch("builtins.open", side_effect=OSError("Write error")),
         patch("os.path.exists", return_value=True),
         patch("os.remove") as mock_remove,
     ):
@@ -96,7 +96,7 @@ def test_write_lock_file_rename_failure_raises_and_cleans_up() -> None:
         patch("core.lock_file_manager.os.makedirs"),
         patch("builtins.open", m),
         patch("os.fsync"),
-        patch("os.replace", side_effect=Exception("Rename failed")),
+        patch("os.replace", side_effect=OSError("Rename failed")),
         patch("os.path.exists", return_value=True),
         patch("os.remove") as mock_remove,
     ):
@@ -118,7 +118,7 @@ def test_write_lock_file_error_without_temp_file() -> None:
     with (
         patch("core.lock_file_manager._file_lock"),
         patch("core.lock_file_manager.os.makedirs"),
-        patch("builtins.open", side_effect=Exception("Write error")),
+        patch("builtins.open", side_effect=OSError("Write error")),
         patch("os.path.exists", return_value=False),
         patch("os.remove") as mock_remove,
     ):

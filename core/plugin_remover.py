@@ -77,15 +77,20 @@ class PluginRemover:
             progress(100)
             return True
 
-        except Exception:
+        except (OSError, ValueError):
             progress(0)
-            return False
+            raise
 
     def _remove_directory(self, plugin_name: str) -> None:
         plugin_path = os.path.join(self.plugin_base_dir, plugin_name)
 
         if os.path.exists(plugin_path):
-            shutil.rmtree(plugin_path)
+            try:
+                shutil.rmtree(plugin_path)
+            except OSError as e:
+                raise OSError(
+                    f"Failed to remove plugin directory: {plugin_path}"
+                ) from e
 
     def _update_lock_file(self, lock_data: LockData, plugin_name: str) -> None:
         lock_data["plugins"] = [
@@ -113,8 +118,8 @@ class PluginRemover:
             )
             if result.returncode == 0:
                 return result.stdout.strip().split()[0]
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            return "Unknown"
 
         return "Unknown"
 
@@ -133,5 +138,5 @@ class PluginRemover:
         try:
             dt = datetime.fromisoformat(last_pull.replace("Z", "+00:00"))
             return dt.strftime("%Y-%m-%d")
-        except Exception:
+        except ValueError:
             return "Unknown"

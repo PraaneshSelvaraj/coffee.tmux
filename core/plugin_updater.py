@@ -145,8 +145,8 @@ class PluginUpdater:
             )
             if result.returncode == 0:
                 return result.stdout.strip().split()[0]
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            return "Unknown"
 
         return "Unknown"
 
@@ -163,8 +163,8 @@ class PluginUpdater:
             )
             if result.returncode == 0:
                 return result.stdout.strip()
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            return "Unknown"
 
         return "Unknown"
 
@@ -202,7 +202,7 @@ class PluginUpdater:
                         tag = tag[:-3]
                     tags.append(tag)
             return self._semantic_sort_tags(tags)
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return []
 
     def _get_latest_commit(self, repo_url: str, branch: str = "HEAD") -> str | None:
@@ -215,8 +215,9 @@ class PluginUpdater:
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.split()[0]
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            return None
+
         return None
 
     def _get_tag_commit_hash(self, repo_url: str, tag: str) -> str | None:
@@ -229,6 +230,7 @@ class PluginUpdater:
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout.split()[0]
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError):
+            return None
+
         return None

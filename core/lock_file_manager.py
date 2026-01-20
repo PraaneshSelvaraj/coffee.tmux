@@ -84,7 +84,7 @@ def write_lock_file(data: LockData) -> None:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(temp_file, LOCK_FILE_PATH)
-        except Exception as e:
+        except (OSError, ValueError, TypeError) as e:
             if os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)

@@ -13,7 +13,7 @@ class PluginLoader:
 
         if not os.path.exists(self.coffee_plugins_list_dir):
             raise FileNotFoundError(
-                f"The plugin directory '{self.coffee_plugins_list_dir}' doesn't exist."
+                f"Plugin directory not found: {self.coffee_plugins_list_dir}"
             )
 
         for filename in os.listdir(self.coffee_plugins_list_dir):
@@ -22,17 +22,15 @@ class PluginLoader:
 
             file_path = os.path.join(self.coffee_plugins_list_dir, filename)
 
-            try:
-                with open(file_path, "r") as f:
-                    raw = yaml.safe_load(f) or {}
+            with open(file_path, "r") as f:
+                raw = yaml.safe_load(f) or {}
 
-                plugin = self._build_plugin_config(raw)
+            plugin = self._build_plugin_config(raw)
 
-                if self._is_valid_plugin(plugin):
-                    plugins.append(plugin)
+            if not self._is_valid_plugin(plugin):
+                raise ValueError(f"Invalid plugin config in {file_path}")
 
-            except Exception as e:
-                print(f"[coffee] Failed to load {file_path}: {e}")
+            plugins.append(plugin)
 
         return plugins
 

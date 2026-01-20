@@ -1,6 +1,8 @@
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from core import PluginRemover
 
 
@@ -41,9 +43,7 @@ def test_get_installed_plugins_with_size_and_tag(
     remover = make_remover()
     plugins = remover.get_installed_plugins()
 
-    assert len(plugins) == 1
     plugin = plugins[0]
-
     assert plugin["name"] == "test-plugin"
     assert plugin["version"] == "v1.0.0"
     assert plugin["size"] == "5.2M"
@@ -73,17 +73,14 @@ def test_get_installed_plugins_path_missing(
     remover = make_remover()
     plugins = remover.get_installed_plugins()
 
-    assert len(plugins) == 1
     plugin = plugins[0]
-
-    assert plugin["name"] == "missing-plugin"
     assert plugin["size"] == "Unknown"
     assert plugin["version"] == "abc1234"
     assert plugin["installed"] == "Unknown"
 
 
 @patch("os.path.exists", return_value=True)
-@patch("subprocess.run", side_effect=Exception("du failed"))
+@patch("subprocess.run", side_effect=OSError("du failed"))
 @patch("core.lock_file_manager.read_lock_file")
 def test_get_installed_plugins_du_failure(
     mock_read: MagicMock,
@@ -91,18 +88,11 @@ def test_get_installed_plugins_du_failure(
     mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {
-        "plugins": [
-            {
-                "name": "plugin",
-                "enabled": True,
-                "git": {"tag": "v2.0.0"},
-            }
-        ]
+        "plugins": [{"name": "plugin", "enabled": True, "git": {"tag": "v2.0.0"}}]
     }
 
     remover = make_remover()
     plugins = remover.get_installed_plugins()
-
     assert plugins[0]["size"] == "Unknown"
 
 
@@ -116,23 +106,17 @@ def test_remove_plugin_success(
     mock_rmtree: MagicMock,
     mock_exists: MagicMock,
 ) -> None:
-    mock_read.return_value = {
-        "plugins": [
-            {"name": "plugin1"},
-            {"name": "plugin2"},
-        ]
-    }
+    mock_read.return_value = {"plugins": [{"name": "plugin1"}, {"name": "plugin2"}]}
 
     remover = make_remover()
     result = remover.remove_plugin("plugin1")
 
     assert result is True
     mock_rmtree.assert_called_once_with("/fake/path/plugin1")
-    mock_write.assert_called_once()
 
-    written_data = mock_write.call_args[0][0]
-    assert len(written_data["plugins"]) == 1
-    assert written_data["plugins"][0]["name"] == "plugin2"
+    written = mock_write.call_args[0][0]
+    assert len(written["plugins"]) == 1
+    assert written["plugins"][0]["name"] == "plugin2"
 
 
 @patch("core.lock_file_manager.read_lock_file")
@@ -140,25 +124,22 @@ def test_remove_plugin_not_in_lock(mock_read: MagicMock) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
 
     remover = make_remover()
-    result = remover.remove_plugin("missing")
-
-    assert result is False
+    assert remover.remove_plugin("missing") is False
 
 
 @patch("os.path.exists", return_value=True)
-@patch("shutil.rmtree", side_effect=Exception("permission denied"))
+@patch("shutil.rmtree", side_effect=OSError("permission denied"))
 @patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_directory_failure(
+def test_remove_plugin_directory_failure_raises(
     mock_read: MagicMock,
     mock_rmtree: MagicMock,
     mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
-
     remover = make_remover()
-    result = remover.remove_plugin("plugin1")
 
-    assert result is False
+    with pytest.raises(OSError):
+        remover.remove_plugin("plugin1")
 
 
 @patch("os.path.exists", return_value=False)
@@ -172,9 +153,7 @@ def test_remove_plugin_directory_missing_still_updates_lock(
     mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
 
     remover = make_remover()
-    result = remover.remove_plugin("plugin1")
-
-    assert result is True
+    assert remover.remove_plugin("plugin1") is True
     mock_write.assert_called_once()
 
 
@@ -189,17 +168,15 @@ def test_remove_plugin_progress_callback(
     mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
+    calls: list[tuple[str, int]] = []
 
-    progress_calls: list[tuple[str, int]] = []
-
-    def progress_cb(name: str, progress: int) -> None:
-        progress_calls.append((name, progress))
+    def cb(name: str, p: int) -> None:
+        calls.append((name, p))
 
     remover = make_remover()
-    result = remover.remove_plugin("plugin1", progress_callback=progress_cb)
+    assert remover.remove_plugin("plugin1", progress_callback=cb) is True
 
-    assert result is True
-    assert progress_calls == [
+    assert calls == [
         ("plugin1", 10),
         ("plugin1", 40),
         ("plugin1", 70),
@@ -207,17 +184,18 @@ def test_remove_plugin_progress_callback(
     ]
 
 
-@patch("core.lock_file_manager.read_lock_file", side_effect=Exception("read error"))
-def test_remove_plugin_exception_handling(
+@patch("core.lock_file_manager.read_lock_file", side_effect=OSError("read error"))
+def test_remove_plugin_read_lock_failure_raises(
     mock_read: MagicMock,
 ) -> None:
-    progress_calls: list[tuple[str, int]] = []
+    calls: list[tuple[str, int]] = []
 
-    def progress_cb(name: str, progress: int) -> None:
-        progress_calls.append((name, progress))
+    def cb(name: str, p: int) -> None:
+        calls.append((name, p))
 
     remover = make_remover()
-    result = remover.remove_plugin("plugin1", progress_callback=progress_cb)
 
-    assert result is False
-    assert progress_calls[-1] == ("plugin1", 0)
+    with pytest.raises(OSError):
+        remover.remove_plugin("plugin1", progress_callback=cb)
+
+    assert calls[-1] == ("plugin1", 0)

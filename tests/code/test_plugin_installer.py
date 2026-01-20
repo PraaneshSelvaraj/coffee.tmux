@@ -3,6 +3,8 @@ import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from core import PluginInstaller
 
 
@@ -131,27 +133,25 @@ def test_install_existing_plugin_with_force(
 
 @patch("subprocess.run")
 @patch("core.PluginInstaller._verify_git_tag_exists", return_value=False)
-def test_install_with_missing_tag_fails(
+def test_install_with_missing_tag_raises(
     mock_verify: MagicMock,
     mock_run: MagicMock,
 ) -> None:
     installer = make_installer_with_plugins()
 
-    success, tag = installer.install_git_plugin(
-        {"name": "foo", "url": "owner/repo", "tag": "v9.9.9"}
-    )
-
-    assert success is False
-    assert tag is None
+    with pytest.raises(ValueError):
+        installer.install_git_plugin(
+            {"name": "foo", "url": "owner/repo", "tag": "v9.9.9"}
+        )
 
 
-@patch("subprocess.run")
-@patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []})
 @patch("core.lock_file_manager.write_lock_file")
+@patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []})
+@patch("subprocess.run")
 def test_progress_callback_called(
-    mock_write: MagicMock,
-    mock_read: MagicMock,
     mock_run: MagicMock,
+    mock_read: MagicMock,
+    mock_write: MagicMock,
 ) -> None:
     progress: list[int] = []
 

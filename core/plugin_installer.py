@@ -43,7 +43,7 @@ class PluginInstaller:
                 return True, used_tag
 
             if not plugin_path.startswith(plugins_dir + os.sep):
-                raise RuntimeError("Refusing to delete outside plugins directory")
+                raise OSError("Refusing to delete outside plugins directory")
 
             if progress_callback:
                 progress_callback(5)  # removing existing plugin
@@ -53,10 +53,12 @@ class PluginInstaller:
             except OSError as e:
                 if progress_callback:
                     progress_callback(0)
-                raise RuntimeError(f"Failed to remove existing plugin: {e}")
+                raise OSError(
+                    f"Failed to remove existing plugin directory: {plugin_path}"
+                ) from e
 
         if "url" not in plugin:
-            raise RuntimeError("Plugin config missing 'url'")
+            raise ValueError("Plugin config missing 'url'")
 
         repo_url = f"https://github.com/{plugin['url']}"
         used_tag = plugin.get("tag")
@@ -77,7 +79,7 @@ class PluginInstaller:
 
             if used_tag:
                 if not self._verify_git_tag_exists(plugin_path, used_tag):
-                    raise RuntimeError(f"Tag '{used_tag}' does not exist")
+                    raise ValueError(f"Tag '{used_tag}' does not exist")
                 self._checkout_tag(plugin_path, used_tag, progress_callback)
             else:
                 if progress_callback:
@@ -96,10 +98,10 @@ class PluginInstaller:
             if progress_callback:
                 progress_callback(100)  # done
 
-        except (subprocess.CalledProcessError, RuntimeError):
+        except (subprocess.CalledProcessError, OSError, ValueError):
             if progress_callback:
                 progress_callback(0)
-            return False, None
+            raise
 
         return True, used_tag or None
 

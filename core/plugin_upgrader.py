@@ -52,9 +52,9 @@ class PluginUpgrader:
             progress(100)
             return True
 
-        except Exception:
+        except (subprocess.CalledProcessError, OSError, ValueError):
             progress(0)
-            return False
+            raise
 
     def _upgrade_to_tag(
         self,

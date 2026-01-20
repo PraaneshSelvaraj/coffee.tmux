@@ -2,6 +2,8 @@ import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from core import PluginUpgrader
 
 
@@ -48,7 +50,6 @@ def test_upgrade_plugin_tag_success(
         new_commit="finalcommit",
     )
 
-    # Progress flow sanity check
     assert progress_calls[0] == 10
     assert progress_calls[-1] == 100
 
@@ -80,8 +81,12 @@ def test_upgrade_plugin_no_update_available() -> None:
     assert success is False
 
 
-@patch.object(PluginUpgrader, "_upgrade_to_tag", side_effect=Exception("git failed"))
-def test_upgrade_plugin_failure_reports_zero_progress(
+@patch.object(
+    PluginUpgrader,
+    "_upgrade_to_tag",
+    side_effect=subprocess.CalledProcessError(1, "git"),
+)
+def test_upgrade_plugin_failure_reports_zero_progress_and_raises(
     mock_upgrade: MagicMock,
 ) -> None:
     upgrader = PluginUpgrader()
@@ -92,9 +97,9 @@ def test_upgrade_plugin_failure_reports_zero_progress(
     def progress_cb(p: int) -> None:
         progress_calls.append(p)
 
-    success = upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
+    with pytest.raises(subprocess.CalledProcessError):
+        upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
 
-    assert success is False
     assert progress_calls[-1] == 0
 
 
