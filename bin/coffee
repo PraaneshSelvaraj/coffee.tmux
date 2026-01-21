@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
-"""
-Coffee CLI executable
-"""
-import os
-import sys
+#!/usr/bin/env bash
 
-# Add the coffee source directory to Python path
-coffee_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, coffee_dir)
+COFFEE_DIR="$HOME/.local/share/coffee"
+PYTHON="$COFFEE_DIR/.venv/bin/python"
 
-from cli.main import main
+if [ ! -x "$PYTHON" ]; then
+  echo "Coffee error: Python venv not found."
+  echo "Run:"
+  echo "  cd ~/.local/share/coffee"
+  echo "  python3 -m venv .venv"
+  echo "  .venv/bin/pip install -r requirements.txt"
+  exit 1
+fi
 
-if __name__ == "__main__":
-    sys.exit(main())
+exec "$PYTHON" "$COFFEE_DIR/cli/main.py" "$@"

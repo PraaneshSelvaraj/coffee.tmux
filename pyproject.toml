@@ -83,6 +83,7 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 strict_optional = true
 check_untyped_defs = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

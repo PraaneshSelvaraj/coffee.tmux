@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Coffee TUI entry point for tmux popup
 """
@@ -9,7 +8,7 @@ import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-from core import PluginRemover, PluginUpdater, PluginUpgrader, plugin_upgrader
+from core import PluginRemover, PluginUpdater, PluginUpgrader
 from ui.app import PluginManagerApp
 from ui.constants import PLUGINS_DIR
 

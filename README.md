@@ -41,13 +41,25 @@ Coffee.tmux keeps the same git-native simplicity and adds clean YAML configurati
 - Python 3.10+
 - git
 
-### Clone & Setup
+### Clone
 
 ```bash
 git clone https://github.com/PraaneshSelvaraj/coffee.tmux ~/.local/share/coffee
-cd ~/.local/share/coffee
-pip install -r requirements.txt
 ```
+
+### Environment Setup
+
+Coffee.tmux runs in its own dedicated Python environment to avoid dependency conflicts with your system Python.
+
+Create and install dependencies into Coffee’s virtual environment:
+
+```bash
+cd ~/.local/share/coffee
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+> Coffee always runs using this environment. You do not need to activate it manually.
 
 ### Add Coffee CLI to PATH
 
