@@ -14,6 +14,7 @@ Modules:
 from . import lock_file_manager
 from .plugin_installer import PluginInstaller
 from .plugin_loader import PluginLoader
+from .plugin_migrator import PluginMigrator
 from .plugin_remover import PluginRemover
 from .plugin_sourcer import PluginSourcer
 from .plugin_updater import PluginUpdater
@@ -22,6 +23,7 @@ from .plugin_upgrader import PluginUpgrader
 __all__ = [
     "PluginSourcer",
     "PluginInstaller",
+    "PluginMigrator",
     "PluginRemover",
     "PluginUpdater",
     "PluginUpgrader",

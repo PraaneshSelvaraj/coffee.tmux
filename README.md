@@ -8,7 +8,7 @@ Coffee.tmux is a modern and intuitive tmux plugin manager with powerful CLI and 
 
 ## Why Coffee.tmux?
 
-If you’ve used TPM, you know how useful it is, but also how easily `.tmux.conf` can turn into a long, messy file.
+If you’ve used TPM, you know how useful it is, but also how easily `.tmux.conf` can turn into a long, messy file as setups grow, making debugging harder and often leaving you hoping everything just works.
 
 Coffee.tmux keeps the same git-native simplicity and adds clean YAML configuration, a proper CLI, and a modern TUI, so managing tmux plugins stays natural and fast.
 
@@ -83,19 +83,25 @@ After editing your tmux config, reload it with:
 tmux source-file ~/.tmux.conf
 ```
 
-### Install Plugins
+## Setting up Plugins
 
-After setup and reloading tmux, run:
+Coffee.tmux is now installed and integrated with tmux. The next step is configuring your plugins.
+
+### Migrating from TPM
+
+If you already use TPM, Coffee can migrate your setup automatically.
 
 ```bash
-coffee install
+coffee migrate
 ```
 
-This installs all plugins configured in your YAML files.
+Coffee.tmux will scan your tmux config, detect existing TPM plugins, and generate minimal Coffee YAML configs
 
-## Plugin Configuration
+> This process is safe and non-destructive. Coffee.tmux does not modify or delete your tmux config.
 
-Create YAML files in:
+### Fresh Setup
+
+Create plugin configurations under:
 
 ```bash
 ~/.config/tmux/coffee/plugins/
@@ -103,7 +109,7 @@ Create YAML files in:
 
 Each plugin is defined in its own YAML file.
 
-### Minimal Configuration
+### Minimal Plugin Configuration
 
 This is all you need to install a plugin.
 
@@ -114,7 +120,17 @@ url: "tmux-plugins/tmux-resurrect"
 
 Coffee.tmux automatically detects source files and manages installation and updates.
 
-### Full Configuration
+## Installing Plugins
+
+After setup and reloading tmux, run:
+
+```bash
+coffee install
+```
+
+This installs all plugins configured in your YAML files.
+
+## Advanced Plugin Configuration
 
 For users who want full control.
 
@@ -163,7 +179,6 @@ Navigate with keys:
 - `R` - Remove tab (remove plugins)
 
 Use `j`/`k` or arrow keys to move selections, `Space` to mark/toggle, and follow on-screen controls.
-
 
 ## Contributing
 

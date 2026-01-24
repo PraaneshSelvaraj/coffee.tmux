@@ -17,6 +17,7 @@ from cli.commands import (
     info,
     install,
     list_plugins,
+    migrate,
     remove,
     update,
     upgrade,
@@ -34,6 +35,7 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   coffee install              Install all configured plugins
+  coffee migrate              Migrate tmux plugins from TPM to Coffee
   coffee update               Check for plugin updates
   coffee upgrade              Upgrade all plugins with updates
   coffee upgrade tmux-sensible  Upgrade specific plugin
@@ -62,6 +64,18 @@ Examples:
     install_parser.add_argument("plugin", nargs="?", help="Specific plugin to install")
     install_parser.add_argument("--force", action="store_true", help="Force reinstall")
     install_parser.set_defaults(func=install.run)
+
+    # Migrate command
+    migrate_parser = subparsers.add_parser(
+        "migrate",
+        help="Migrate tmux plugin configuration from TPM to Coffee",
+    )
+    migrate_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing plugin config files",
+    )
+    migrate_parser.set_defaults(func=migrate.run)
 
     # Update command
     update_parser = subparsers.add_parser("update", help="Check for plugin updates")
