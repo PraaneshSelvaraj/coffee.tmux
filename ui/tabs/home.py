@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Any
 
-from rich import style
 from rich.box import ROUNDED
+from rich.console import Group
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
@@ -78,6 +78,7 @@ class HomeTab(Tab):
 
     def display_plugin_details(self, app_state: Any) -> Panel:
         display_list = self.get_display_list()
+
         if not display_list or app_state.current_selection >= len(display_list):
             return Panel(
                 Text("No plugin selected"),
@@ -87,6 +88,7 @@ class HomeTab(Tab):
                 style=BACKGROUND_STYLE,
             )
         selected_item = display_list[app_state.current_selection]
+
         if selected_item["type"] == "header":
             header_text = selected_item["text"]
             lock_file = lfm.read_lock_file()
@@ -96,19 +98,29 @@ class HomeTab(Tab):
                 if header_text == "Active Plugins"
                 else len([p for p in plugins if not p.get("enabled")])
             )
+
             info = Text()
             info.append(f"{header_text}\n", style="bold #e0af68")
             info.append("Total: ", style="#5F9EA0")
             info.append(f"{count}\n\n", style="#5F9EA0")
             info.append("Controls:\n", style="#5F9EA0")
-            info.append(" j / k    ", style="bold white")
-            info.append("- Move up / down\n")
-            info.append(" SPACE    ", style="bold white")
-            info.append("- Toggle\n")
-            info.append(" q        ", style="bold white")
-            info.append("- Quit\n")
-            return Panel(
+
+            controls = Table.grid(padding=(0, 1))
+            controls.add_column(justify="left", no_wrap=True)
+            controls.add_column(justify="left")
+
+            controls.add_row("H / I / U / R", "Switch tabs")
+            controls.add_row("j / k", "Move up / down")
+            controls.add_row("SPACE", "Toggle")
+            controls.add_row("q", "Quit")
+
+            content = Group(
                 info,
+                controls,
+            )
+
+            return Panel(
+                content,
                 title="Info",
                 border_style=ACCENT_COLOR,
                 box=ROUNDED,
