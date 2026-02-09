@@ -67,11 +67,18 @@ class InstallTab(Tab):
                     "[✓] " if marked else "[ ] ",
                     style=f"bold {SELECTION_COLOR}" if marked else "dim white",
                 )
-                tag_text = f" ({plugin['tag']})" if plugin["tag"] != "latest" else ""
+
+                tag = plugin.get("tag")
+                if tag and tag != "latest":
+                    tag_text = f" ({tag})"
+                else:
+                    tag_text = ""
+
                 name_text = Text(
                     f"{plugin['name']}{tag_text}",
                     style=f"bold {SELECTION_COLOR}" if is_selected else "white",
                 )
+
                 progress = plugin.get("progress", 0)
                 progress_text_obj = Text()
                 if 0 < progress < 100:
@@ -107,7 +114,6 @@ class InstallTab(Tab):
             details.append(
                 f"{'Repository':<18}: {plugin['description']}\n", style="white"
             )
-            details.append(f"{'Version':<18}: {plugin['tag']}\n", style="white")
             progress = plugin.get("progress", 0)
             if 0 < progress < 100:
                 bar_len = 20

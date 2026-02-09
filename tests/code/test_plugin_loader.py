@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +26,7 @@ url: https://github.com/owner/my-plugin.git
     assert len(plugins) == 1
     plugin = plugins[0]
 
-    assert plugin["url"] == "https://github.com/owner/my-plugin.git"
+    assert plugin["url"] == "owner/my-plugin"
     assert plugin["name"] == "my-plugin"
     assert plugin["local"] is False
     assert plugin["source"] == []
@@ -81,13 +80,13 @@ def test_load_plugins_missing_url_raises(tmp_path: Path) -> None:
         loader.load_plugins()
 
 
-def test_load_plugins_empty_yaml_file(tmp_path: Path) -> None:
+def test_load_plugins_empty_yaml_file_raises(tmp_path: Path) -> None:
     (tmp_path / "empty.yml").write_text("")
 
     loader = PluginLoader(str(tmp_path))
 
     with pytest.raises(ValueError):
-        plugins = loader.load_plugins()
+        loader.load_plugins()
 
 
 def test_load_plugins_invalid_yaml_syntax_raises(tmp_path: Path) -> None:
@@ -154,3 +153,42 @@ def test_load_plugins_file_read_error_raises(tmp_path: Path) -> None:
     with patch("builtins.open", side_effect=PermissionError("denied")):
         with pytest.raises(PermissionError):
             loader.load_plugins()
+
+
+def test_load_plugins_duplicate_repo_across_files_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.yml").write_text("url: owner/repo")
+    (tmp_path / "b.yml").write_text("url: owner/repo")
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="Duplicate plugin URL"):
+        loader.load_plugins()
+
+
+def test_load_plugins_duplicate_repo_different_url_forms_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.yml").write_text("url: owner/repo")
+    (tmp_path / "b.yml").write_text("url: https://github.com/owner/repo.git")
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        loader.load_plugins()
+
+
+def test_load_plugins_duplicate_repo_case_insensitive_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.yml").write_text("url: Owner/Repo")
+    (tmp_path / "b.yml").write_text("url: owner/repo")
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        loader.load_plugins()
+
+
+def test_plugin_name_derived_from_url(tmp_path: Path) -> None:
+    (tmp_path / "plugin.yml").write_text("url: owner/my-plugin")
+
+    loader = PluginLoader(str(tmp_path))
+    plugin = loader.load_plugins()[0]
+
+    assert plugin["name"] == "my-plugin"
