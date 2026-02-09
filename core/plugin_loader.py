@@ -10,6 +10,7 @@ class PluginLoader:
 
     def load_plugins(self) -> list[dict[str, Any]]:
         plugins: list[dict[str, Any]] = []
+        plugin_urls: set[str] = set()
 
         if not os.path.exists(self.coffee_plugins_list_dir):
             raise FileNotFoundError(
@@ -30,6 +31,15 @@ class PluginLoader:
             if not self._is_valid_plugin(plugin):
                 raise ValueError(f"Invalid plugin config in {file_path}")
 
+            normalized_url = self._normalize_url(plugin["url"])
+
+            if normalized_url in plugin_urls:
+                raise ValueError(
+                    f"Duplicate plugin URL detected for repository '{normalized_url}' (in {file_path})"
+                )
+
+            plugin_urls.add(normalized_url)
+            plugin["url"] = normalized_url
             plugins.append(plugin)
 
         return plugins
@@ -54,6 +64,17 @@ class PluginLoader:
         url = plugin.get("url")
 
         return isinstance(url, str) and url.strip() != ""
+
+    def _normalize_url(self, url: str) -> str:
+        url = url.strip()
+
+        if url.startswith("https://github.com/"):
+            url = url[len("https://github.com/") :]
+
+        if url.endswith(".git"):
+            url = url.removesuffix(".git")
+
+        return url.lower()
 
     def _derive_name_from_url(self, url: str) -> str:
         base = url.rstrip("/").split("/")[-1]
