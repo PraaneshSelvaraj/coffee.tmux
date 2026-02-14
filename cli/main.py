@@ -3,6 +3,8 @@ Coffee CLI - Main entry point
 """
 
 import argparse
+import asyncio
+import inspect
 import os
 import sys
 import traceback
@@ -148,7 +150,10 @@ def main() -> int:
     # Handle commands
     if hasattr(args, "func"):
         try:
-            return args.func(args)
+            if inspect.iscoroutinefunction(args.func):
+                return asyncio.run(args.func(args))
+            else:
+                return args.func(args)
         except KeyboardInterrupt:
             print("\nOperation cancelled by user")
             return 1

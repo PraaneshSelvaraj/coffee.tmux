@@ -2,6 +2,7 @@
 Install command implementation
 """
 
+import asyncio
 import os
 from typing import Any, Optional
 
@@ -27,7 +28,7 @@ class Args:
     force: bool
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run install command"""
     try:
         # Load plugin configurations
@@ -87,16 +88,18 @@ Then run:
 
         if args.quiet:
             # Quiet mode - no progress bars
-            for plugin in plugins_to_install:
-                success, used_tag = installer.install_git_plugin(
-                    plugin, force=args.force
-                )
-                if not success:
-                    print_error(f"Failed to install {plugin['name']}")
-                    return 1
+            tasks = [
+                installer.install_git_plugin(plugin, force=args.force)
+                for plugin in plugins_to_install
+            ]
+
+            results = await asyncio.gather(*tasks)
+
         else:
             # Normal mode with progress bars
             with create_progress() as progress:
+                tasks = []
+
                 for plugin in plugins_to_install:
                     task_id: TaskID = progress.add_task(
                         f"Installing {plugin['name']}", total=100
@@ -106,19 +109,23 @@ Then run:
                     def callback(percent: int, task_id: TaskID = task_id) -> None:
                         progress.update(task_id, completed=percent)
 
-                    success, used_tag = installer.install_git_plugin(
-                        plugin, callback, force=args.force
+                    tasks.append(
+                        installer.install_git_plugin(plugin, callback, force=args.force)
                     )
 
-                    if success:
-                        progress.update(task_id, completed=100)
-                        console.print(
-                            f"[bold {HIGHLIGHT_COLOR}]SUCCESS[/] Installed {plugin['name']} @ [bold white]{used_tag or 'latest'}[/]"
-                        )
+                results = await asyncio.gather(*tasks)
 
-                    else:
-                        progress.update(task_id, completed=0)
-                        print_error(f"Failed to install {plugin['name']}")
+                for result in results:
+                    plugin = result["plugin"]
+                    used_tag = result["used_tag"]
+
+                    console.print(
+                        f"[bold {HIGHLIGHT_COLOR}]SUCCESS[/] "
+                        f"Installed {plugin['name']} @ "
+                        f"[bold white]{used_tag or 'latest'}[/]"
+                    )
+
+        installer.update_lock_file(results)
 
         if not args.quiet:
             console.print(f"[bold {HIGHLIGHT_COLOR}]SUCCESS[/] Installation complete!")

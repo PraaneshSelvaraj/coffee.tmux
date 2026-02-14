@@ -1,6 +1,6 @@
+import asyncio
 import os
 import shutil
-import subprocess
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -18,16 +18,16 @@ class PluginInstaller:
         self.plugins_dir = plugins_dir
         self.tmux_conf_path = tmux_conf_path
 
-    def install_git_plugin(
+    async def install_git_plugin(
         self,
         plugin: dict[str, Any],
         progress_callback: Callable[[int], None] | None = None,
         force: bool = False,
-    ) -> tuple[bool, str | None]:
+    ) -> dict[str, Any]:
         plugin_path = os.path.abspath(os.path.join(self.plugins_dir, plugin["name"]))
         plugins_dir = os.path.abspath(self.plugins_dir)
 
-        # Plugin already exists
+        # Already exists
         if os.path.exists(plugin_path):
             if not force:
                 lock_data = lfm.read_lock_file()
@@ -40,22 +40,21 @@ class PluginInstaller:
                 if progress_callback:
                     progress_callback(100)
 
-                return True, used_tag
+                return {
+                    "plugin": plugin,
+                    "used_tag": used_tag,
+                    "commit_hash": (
+                        existing.get("git", {}).get("commit_hash") if existing else None
+                    ),
+                }
 
             if not plugin_path.startswith(plugins_dir + os.sep):
                 raise OSError("Refusing to delete outside plugins directory")
 
             if progress_callback:
-                progress_callback(5)  # removing existing plugin
+                progress_callback(5)
 
-            try:
-                shutil.rmtree(plugin_path)
-            except OSError as e:
-                if progress_callback:
-                    progress_callback(0)
-                raise OSError(
-                    f"Failed to remove existing plugin directory: {plugin_path}"
-                ) from e
+            shutil.rmtree(plugin_path)
 
         if "url" not in plugin:
             raise ValueError("Plugin config missing 'url'")
@@ -63,112 +62,170 @@ class PluginInstaller:
         repo_url = f"https://github.com/{plugin['url']}"
         used_tag = plugin.get("tag")
 
-        try:
+        if progress_callback:
+            progress_callback(0)
+
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "clone",
+            repo_url,
+            plugin_path,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+
+        await process.wait()
+
+        if process.returncode != 0:
+            raise RuntimeError("Git clone failed")
+
+        if progress_callback:
+            progress_callback(40)
+
+        if used_tag:
+            exists = await self._verify_git_tag_exists(plugin_path, used_tag)
+            if not exists:
+                raise ValueError(f"Tag '{used_tag}' does not exist")
+
+            await self._checkout_tag(plugin_path, used_tag, progress_callback)
+        else:
             if progress_callback:
-                progress_callback(0)  # start
+                progress_callback(55)
 
-            subprocess.run(
-                ["git", "clone", repo_url, plugin_path],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            latest_tag = await self._get_latest_tag(plugin_path)
+            if latest_tag:
+                await self._checkout_tag(plugin_path, latest_tag, progress_callback)
+                used_tag = latest_tag
 
-            if progress_callback:
-                progress_callback(40)  # clone complete
+        commit_hash = await self._get_commit_hash(plugin)
 
-            if used_tag:
-                if not self._verify_git_tag_exists(plugin_path, used_tag):
-                    raise ValueError(f"Tag '{used_tag}' does not exist")
-                self._checkout_tag(plugin_path, used_tag, progress_callback)
-            else:
-                if progress_callback:
-                    progress_callback(55)  # resolving latest tag
+        if progress_callback:
+            progress_callback(100)
 
-                latest_tag = self._get_latest_tag(plugin_path)
-                if latest_tag:
-                    self._checkout_tag(plugin_path, latest_tag, progress_callback)
-                    used_tag = latest_tag
+        return {
+            "plugin": plugin,
+            "used_tag": used_tag,
+            "commit_hash": commit_hash,
+        }
 
-            if progress_callback:
-                progress_callback(95)  # writing lock file
+    async def _get_latest_tag(self, plugin_path: str) -> str | None:
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "tag",
+            "--sort=-version:refname",
+            cwd=plugin_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
 
-            self._update_lock_file(plugin, used_tag)
+        stdout, _ = await process.communicate()
 
-            if progress_callback:
-                progress_callback(100)  # done
-
-        except (subprocess.CalledProcessError, OSError, ValueError):
-            if progress_callback:
-                progress_callback(0)
-            raise
-
-        return True, used_tag or None
-
-    def _get_latest_tag(self, plugin_path: str) -> str | None:
-        try:
-            result = subprocess.run(
-                ["git", "tag", "--sort=-version:refname"],
-                cwd=plugin_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=True,
-                text=True,
-            )
-            tags = result.stdout.strip().split("\n")
-            return tags[0] if tags and tags[0] else None
-        except subprocess.CalledProcessError:
+        if process.returncode != 0:
             return None
 
-    def _checkout_tag(
+        tags = stdout.decode().strip().split("\n")
+        return tags[0] if tags and tags[0] else None
+
+    async def _checkout_tag(
         self,
         plugin_path: str,
         tag: str,
         progress_callback: Callable[[int], None] | None = None,
     ) -> None:
         if progress_callback:
-            progress_callback(70)  # checkout start
+            progress_callback(70)
 
-        subprocess.run(
-            ["git", "checkout", "--detach", f"tags/{tag}"],
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "checkout",
+            "--detach",
+            f"tags/{tag}",
             cwd=plugin_path,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
+
+        await process.wait()
+
+        if process.returncode != 0:
+            raise RuntimeError(f"Git checkout failed for tag {tag}")
 
         if progress_callback:
-            progress_callback(85)  # checkout complete
+            progress_callback(85)
 
-    def _verify_git_tag_exists(self, repo_path: str, tag: str) -> bool:
-        result = subprocess.run(
-            [
-                "git",
-                "show-ref",
-                "--tags",
-                "--verify",
-                "--quiet",
-                f"refs/tags/{tag}",
-            ],
-            cwd=str(repo_path),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+    async def _verify_git_tag_exists(self, repo_path: str, tag: str) -> bool:
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "show-ref",
+            "--tags",
+            "--verify",
+            "--quiet",
+            f"refs/tags/{tag}",
+            cwd=repo_path,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        return result.returncode == 0
 
-    def _get_commit_hash(self, plugin: dict[str, Any]) -> str | None:
+        await process.wait()
+        return process.returncode == 0
+
+    async def _get_commit_hash(self, plugin: dict[str, Any]) -> str | None:
         plugin_path = os.path.join(self.plugins_dir, plugin["name"])
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=plugin_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return result.stdout.strip()
-        except subprocess.CalledProcessError:
+
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "rev-parse",
+            "HEAD",
+            cwd=plugin_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+
+        stdout, _ = await process.communicate()
+
+        if process.returncode != 0:
             return None
+
+        return stdout.decode().strip()
+
+    def update_lock_file(self, results: list[dict[str, Any]]) -> None:
+        lock_data = lfm.read_lock_file()
+
+        for result in results:
+            plugin = result["plugin"]
+            used_tag = result["used_tag"]
+            commit_hash = result["commit_hash"]
+
+            plugin_path = os.path.join(self.plugins_dir, plugin["name"])
+
+            if plugin.get("source"):
+                sources = [
+                    os.path.join(plugin_path, s) for s in plugin.get("source", [])
+                ]
+            else:
+                sources = self._discover_tmux_sources(plugin_path)
+
+            plugin_data = {
+                "name": plugin["name"],
+                "source": sources,
+                "enabled": plugin.get("enabled", True),
+                "install_path": plugin_path,
+                "skip_auto_update": plugin.get("skip_auto_update", False),
+                "git": {
+                    "repo": plugin["url"],
+                    "tag": used_tag,
+                    "commit_hash": commit_hash,
+                    "last_pull": self._get_current_timestamp(),
+                },
+            }
+
+            lock_data["plugins"] = [
+                p for p in lock_data["plugins"] if p["name"] != plugin["name"]
+            ]
+
+            lock_data["plugins"].append(plugin_data)
+
+        lfm.write_lock_file(lock_data)
 
     def _discover_tmux_sources(self, plugin_path: str) -> list[str]:
         sources: list[str] = []
@@ -180,41 +237,5 @@ class PluginInstaller:
 
         return sorted(sources)
 
-    def _update_lock_file(self, plugin: dict[str, Any], used_tag: str | None) -> None:
-        plugin_path = os.path.join(self.plugins_dir, plugin["name"])
-
-        if plugin.get("source"):
-            sources = [
-                os.path.join(plugin_path, source) for source in plugin.get("source", [])
-            ]
-        else:
-            sources = self._discover_tmux_sources(plugin_path)
-
-        plugin_data: dict[str, Any] = {
-            "name": plugin["name"],
-            "source": sources,
-            "enabled": plugin.get("enabled", True),
-            "install_path": plugin_path,
-            "skip_auto_update": plugin.get("skip_auto_update", False),
-            "git": {
-                "repo": plugin["url"],
-                "tag": used_tag,
-                "commit_hash": self._get_commit_hash(plugin),
-                "last_pull": self._get_current_timestamp(),
-            },
-        }
-
-        lock_data = lfm.read_lock_file()
-
-        existing_plugin = next(
-            (p for p in lock_data["plugins"] if p["name"] == plugin["name"]), None
-        )
-
-        if existing_plugin:
-            lock_data["plugins"].remove(existing_plugin)
-
-        lock_data["plugins"].append(plugin_data)
-        lfm.write_lock_file(lock_data)
-
     def _get_current_timestamp(self) -> str:
-        return str(datetime.now(timezone.utc))
+        return datetime.now(timezone.utc).isoformat()
