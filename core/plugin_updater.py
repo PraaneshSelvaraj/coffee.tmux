@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 from typing import Any
@@ -11,7 +12,7 @@ class PluginUpdater:
     def __init__(self, plugins_dir: str) -> None:
         self.plugins_dir = plugins_dir
 
-    def _plan_plugin_update(self, plugin: dict[str, Any]) -> dict[str, Any]:
+    async def _plan_plugin_update(self, plugin: dict[str, Any]) -> dict[str, Any]:
         name = plugin["name"]
         plugin_path = os.path.join(self.plugins_dir, name)
         git_info = plugin.get("git", {})
@@ -36,20 +37,20 @@ class PluginUpdater:
         update_available = False
 
         if current_tag:
-            remote_tags = self._get_remote_tags(repo_url)
+            remote_tags = await self._get_remote_tags(repo_url)
             if remote_tags:
                 latest_tag = remote_tags[0]
                 update_type = "tag"
                 new_tag = latest_tag
                 if current_tag != latest_tag:
-                    new_commit = self._get_tag_commit_hash(repo_url, latest_tag)
+                    new_commit = await self._get_tag_commit_hash(repo_url, latest_tag)
                     update_available = True
                 else:
                     new_commit = current_commit
             else:
                 new_commit = current_commit
         else:
-            latest_commit = self._get_latest_commit(repo_url)
+            latest_commit = await self._get_latest_commit(repo_url)
             if latest_commit and latest_commit != current_commit:
                 new_commit = latest_commit
                 update_available = True
@@ -70,7 +71,7 @@ class PluginUpdater:
             },
         }
 
-    def _build_update_view(self, plan: dict[str, Any]) -> dict[str, Any]:
+    async def _build_update_view(self, plan: dict[str, Any]) -> dict[str, Any]:
         name = plan["name"]
         internal = plan["_internal"]
 
@@ -100,8 +101,8 @@ class PluginUpdater:
             "name": name,
             "current_version": old_version,
             "new_version": new_version,
-            "size": self._get_repo_size(plugin_path),
-            "released": self._get_time_since_tag(
+            "size": await self._get_repo_size(plugin_path),
+            "released": await self._get_time_since_tag(
                 plugin_path, internal.get("new_tag") or internal.get("old_tag")
             ),
             "changelog": [f"Update available: {old_version} → {new_version}"],
@@ -110,63 +111,88 @@ class PluginUpdater:
             "_internal": internal,
         }
 
-    def check_for_updates(self) -> list[dict[str, Any]]:
-        updates: list[dict[str, Any]] = []
-        lock_data = lfm.read_lock_file()
+    async def check_for_update(self, plugin: dict[str, Any]) -> dict[str, Any]:
+        plan = await self._plan_plugin_update(plugin)
+        view = await self._build_update_view(plan)
+        return view
 
-        for plugin in lock_data.get("plugins", []):
-            plan = self._plan_plugin_update(plugin)
-            ui_update = self._build_update_view(plan)
-            updates.append(ui_update)
-
-        return updates
-
-    def _safe_check_output(
-        self, cmd: list[str], cwd: str | None = None, default: Any | None = None
-    ) -> str | None:
-        try:
-            return subprocess.check_output(cmd, cwd=cwd, text=True).strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return default
-
-    def _get_local_head_commit(
+    async def _get_local_head_commit(
         self, plugin_path: str, short: bool = False
     ) -> str | None:
-        out = self._safe_check_output(["git", "rev-parse", "HEAD"], cwd=plugin_path)
-        if out and short:
-            return out[:7]
-
-        return out
-
-    def _get_repo_size(self, plugin_path: str) -> str:
         try:
-            result = subprocess.run(
-                ["du", "-sh", ".git"], cwd=plugin_path, capture_output=True, text=True
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "rev-parse",
+                "HEAD",
+                cwd=plugin_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode == 0:
-                return result.stdout.strip().split()[0]
-        except (OSError, subprocess.SubprocessError):
+
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return None
+
+            output = stdout.decode().strip()
+            if short:
+                return output[:7]
+
+            return output
+
+        except OSError:
+            return None
+
+    async def _get_repo_size(self, plugin_path: str) -> str:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "du",
+                "-sh",
+                ".git",
+                cwd=plugin_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return "Unknown"
+
+            output = stdout.decode().strip()
+
+            if not output:
+                return "Unknown"
+
+            return output.split()[0]
+
+        except OSError:
             return "Unknown"
 
-        return "Unknown"
-
-    def _get_time_since_tag(self, plugin_path: str, tag: str | None) -> str:
+    async def _get_time_since_tag(self, plugin_path: str, tag: str | None) -> str:
         if not tag:
             return "Unknown"
 
         try:
-            result = subprocess.run(
-                ["git", "log", "-1", "--format=%cr", f"tags/{tag}"],
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "log",
+                "-1",
+                "--format=%cr",
+                f"tags/{tag}",
                 cwd=plugin_path,
-                capture_output=True,
-                text=True,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            return "Unknown"
 
-        return "Unknown"
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return "Unknown"
+
+            return stdout.decode().strip()
+        except OSError:
+            return "Unknown"
 
     def _semantic_sort_tags(self, tags: list[str]) -> list[str]:
         versions: list[tuple[Version, str]] = []
@@ -183,54 +209,81 @@ class PluginUpdater:
         versions.sort(key=lambda x: x[0], reverse=True)
         return [tag for _, tag in versions]
 
-    def _get_remote_tags(self, repo_url: str) -> list[str]:
+    async def _get_remote_tags(self, repo_url: str) -> list[str]:
         try:
-            result = subprocess.run(
-                ["git", "ls-remote", "--tags", repo_url],
-                capture_output=True,
-                text=True,
-                check=False,
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "ls-remote",
+                "--tags",
+                repo_url,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode != 0:
+
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
                 return []
+
             tags: list[str] = []
-            for line in result.stdout.splitlines():
+            for line in stdout.decode().splitlines():
                 parts = line.split()
-                if len(parts) == 2 and "refs/tags/" in parts[1]:
+                if len(parts) == 2 and parts[1].startswith("refs/tags/"):
                     tag = parts[1].split("/")[-1]
                     if tag.endswith("^{}"):
                         tag = tag[:-3]
                     tags.append(tag)
             return self._semantic_sort_tags(tags)
-        except (OSError, subprocess.SubprocessError):
+        except OSError:
             return []
 
-    def _get_latest_commit(self, repo_url: str, branch: str = "HEAD") -> str | None:
+    async def _get_latest_commit(
+        self, repo_url: str, branch: str = "HEAD"
+    ) -> str | None:
         try:
-            result = subprocess.run(
-                ["git", "ls-remote", repo_url, branch],
-                capture_output=True,
-                text=True,
-                check=False,
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "ls-remote",
+                repo_url,
+                branch,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode == 0 and result.stdout:
-                return result.stdout.split()[0]
-        except (OSError, subprocess.SubprocessError):
+
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return None
+
+            output = stdout.decode().strip()
+            if not output:
+                return None
+
+            return output.split()[0]
+
+        except OSError:
             return None
 
-        return None
-
-    def _get_tag_commit_hash(self, repo_url: str, tag: str) -> str | None:
+    async def _get_tag_commit_hash(self, repo_url: str, tag: str) -> str | None:
         try:
-            result = subprocess.run(
-                ["git", "ls-remote", repo_url, f"refs/tags/{tag}"],
-                capture_output=True,
-                text=True,
-                check=False,
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "ls-remote",
+                repo_url,
+                f"refs/tags/{tag}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode == 0 and result.stdout:
-                return result.stdout.split()[0]
-        except (OSError, subprocess.SubprocessError):
-            return None
 
-        return None
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return None
+
+            output = stdout.decode().strip()
+            if not output:
+                return None
+
+            return output.split()[0]
+        except OSError:
+            return None
