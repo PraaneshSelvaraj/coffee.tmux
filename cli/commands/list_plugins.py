@@ -23,11 +23,11 @@ class Args:
     table: bool
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run list command"""
     try:
         remover = PluginRemover(COFFEE_PLUGINS_DIR)
-        plugins: list[dict[str, Any]] = remover.get_installed_plugins()
+        plugins: list[dict[str, Any]] = await remover.get_installed_plugins()
 
         if not plugins:
             if not args.quiet:

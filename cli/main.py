@@ -103,7 +103,7 @@ Examples:
     list_parser = subparsers.add_parser("list", help="List installed plugins")
     list_parser.add_argument("--table", action="store_true", help="Display as table")
     list_parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
-    list_parser.set_defaults(func=lambda args: list_plugins.run(args))
+    list_parser.set_defaults(func=list_plugins.run)
 
     # Info command
     info_parser = subparsers.add_parser("info", help="Show plugin information")

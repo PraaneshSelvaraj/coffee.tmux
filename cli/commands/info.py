@@ -25,11 +25,11 @@ class Args:
     plugin: str
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run info command"""
     try:
         remover = PluginRemover(COFFEE_PLUGINS_DIR)
-        installed_plugins: list[dict[str, Any]] = remover.get_installed_plugins()
+        installed_plugins: list[dict[str, Any]] = await remover.get_installed_plugins()
 
         # Find the plugin
         plugin_info: Optional[dict[str, Any]] = None
