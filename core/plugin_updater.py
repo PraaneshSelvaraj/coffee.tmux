@@ -1,11 +1,8 @@
 import asyncio
 import os
-import subprocess
 from typing import Any
 
 from packaging.version import InvalidVersion, Version
-
-from core import lock_file_manager as lfm
 
 
 class PluginUpdater:

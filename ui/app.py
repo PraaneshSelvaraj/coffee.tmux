@@ -1,3 +1,4 @@
+import asyncio
 import os
 import traceback
 from typing import Any
@@ -82,22 +83,26 @@ class PluginManagerApp(App):
 
     def action_switch_to_update(self) -> None:
         self.app_state.current_tab = "Update"
-        if not self.app_state.update_data:
-            self.app_state.refresh_updates()
+
+        if not self.app_state.update_data and not self.app_state.checking_updates:
+            _ = self.action_check_updates()
+
         self.rich_display.refresh()
 
     def action_switch_to_remove(self) -> None:
         self.app_state.current_tab = "Remove"
+
         if not self.app_state.remove_data:
-            self.app_state.refresh_remove_data()
+            self.action_refresh_remove_list()
+
         self.rich_display.refresh()
 
-    def action_refresh_remove_list(self) -> None:
+    @work(exclusive=True)
+    async def action_refresh_remove_list(self) -> None:
         if self.app_state.current_tab == "Remove":
-            self.app_state.refresh_remove_data()
+            await self.app_state.refresh_remove_data()
             self.app_state.remove_selected = 0
             self.app_state.marked_for_removal.clear()
-            self.notify("Plugin list refreshed")
         self.rich_display.refresh()
 
     def action_move_down(self) -> None:
@@ -169,73 +174,118 @@ class PluginManagerApp(App):
                     self.app_state.marked_for_removal.add(plugin_name)
         self.rich_display.refresh()
 
-    def action_check_updates(self) -> None:
-        if self.app_state.current_tab == "Update":
-            if not self.app_state.checking_updates:
-                self.app_state.refresh_updates()
-            self.rich_display.refresh()
+    @work(exclusive=True)
+    async def action_check_updates(self) -> None:
+        self.rich_display.refresh()
+        await self.app_state.refresh_updates()
 
-    @work(exclusive=True, thread=True)
-    def install_plugins_in_background(self, plugins_to_install: list[dict]) -> None:
+    @work(exclusive=True)
+    async def install_plugins_in_background(
+        self, plugins_to_install: list[dict]
+    ) -> None:
         try:
             console.log(
-                f"[blue]Background installation started for plugins: {[p['name'] for p in plugins_to_install]}[/blue]"
+                f"[blue]Background installation started for plugins: "
+                f"{[p['name'] for p in plugins_to_install]}[/blue]"
             )
+
             installer = PluginInstaller(
                 [p["_config"] for p in plugins_to_install],
                 PLUGINS_DIR,
                 os.path.expanduser("~/.config/tmux/"),
             )
+
+            results: list[dict] = []
             installed_plugins: list[str] = []
-            for plugin_data in plugins_to_install:
+
+            async def install_one(plugin_data: dict) -> tuple[str, dict | None]:
                 plugin_name = plugin_data["name"]
                 config = plugin_data["_config"]
+
                 console.log(f"[blue]Starting installation for {plugin_name}[/blue]")
 
                 def progress_callback(progress: int) -> None:
                     self.app_state.install_progress_callback(plugin_name, progress)
 
-                success, _ = installer.install_git_plugin(
-                    config,
-                    progress_callback,
-                    force=False,
-                )
-                if success:
-                    self.app_state.install_progress_callback(plugin_name, 100)
-                    console.log(f"[green]Successfully installed {plugin_name}[/green]")
-                    installed_plugins.append(plugin_name)
-                else:
-                    console.log(f"[red]Failed to install {plugin_name}[/red]")
-                    self.app_state.install_progress_callback(plugin_name, 0)
-                    self.call_from_thread(
-                        lambda name=plugin_name: self.notify(
-                            f"Failed to install {name}", severity="error"
-                        )
+                try:
+                    result = await installer.install_git_plugin(
+                        config,
+                        progress_callback,
+                        force=False,
                     )
+
+                    if result:
+                        console.log(
+                            f"[green]Successfully installed {plugin_name}[/green]"
+                        )
+                        self.app_state.install_progress_callback(plugin_name, 100)
+                        return plugin_name, result
+                    else:
+                        console.log(f"[red]Failed to install {plugin_name}[/red]")
+                        self.app_state.install_progress_callback(plugin_name, 0)
+                        return plugin_name, None
+
+                except Exception as e:
+                    console.log(f"[red]Error installing {plugin_name}: {e}[/red]")
+                    self.app_state.install_progress_callback(plugin_name, 0)
+                    return plugin_name, None
+
+            # Create tasks for all plugins
+            tasks = [
+                asyncio.create_task(install_one(plugin_data))
+                for plugin_data in plugins_to_install
+            ]
+
+            # Wait for all to complete
+            results_raw = await asyncio.gather(*tasks)
+
+            # Process results
+            for plugin_name, result in results_raw:
+                if result:
+                    results.append(result)
+                    installed_plugins.append(plugin_name)
+
+            # Write lock file once (batch update)
+            if results:
+                console.log("[blue]Updating lock file after installation[/blue]")
+                installer.update_lock_file(results)
+
+            # Remove installed plugins from install list
             if installed_plugins:
                 console.log(
-                    f"[green]Removing installed plugins from install list: {installed_plugins}[/green]"
+                    f"[green]Removing installed plugins from install list: "
+                    f"{installed_plugins}[/green]"
                 )
+
                 self.app_state.install_data = [
                     p
                     for p in self.app_state.install_data
                     if p["name"] not in installed_plugins
                 ]
+
                 if self.app_state.install_selected >= len(self.app_state.install_data):
                     self.app_state.install_selected = max(
                         0, len(self.app_state.install_data) - 1
                     )
-            self.call_from_thread(self.rich_display.refresh)
+
+                self.notify(
+                    f"Installed {len(installed_plugins)} plugin(s) successfully."
+                )
+
+            self.rich_display.refresh()
+
             console.log("[blue]Background installation worker completed[/blue]")
+
         except Exception as e:
             console.log(f"[red]Error in background installation: {e}[/red]")
             console.log(f"[red]Traceback: {traceback.format_exc()}[/red]")
-            self.call_from_thread(
-                lambda: self.notify(f"Installation failed: {str(e)}", severity="error")
+            self.notify(
+                f"Installation failed: {str(e)}",
+                severity="error",
             )
 
     def action_install_marked(self) -> None:
-        self.console.log("✅ Ctrl+I pressed, installing all plugins...")
+        self.console.log("Ctrl+I pressed, installing all plugins...")
         if self.app_state.current_tab == "Install":
             installable_plugins = getattr(self.app_state, "install_data", [])
             marked_plugins = [p for p in installable_plugins if p.get("marked", False)]
@@ -243,7 +293,7 @@ class PluginManagerApp(App):
                 for plugin in marked_plugins:
                     plugin["progress"] = 0
                     self.app_state.installing_progress[plugin["name"]] = 0
-                self.install_plugins_in_background(marked_plugins)
+                _ = self.install_plugins_in_background(marked_plugins)
                 self.notify(f"Installing {len(marked_plugins)} marked plugin(s)...")
             else:
                 self.notify(
@@ -251,46 +301,83 @@ class PluginManagerApp(App):
                 )
         self.rich_display.refresh()
 
-    def action_install_all(self) -> None:
+    async def action_install_all(self) -> None:
         if self.app_state.current_tab == "Install":
             installable_plugins = getattr(self.app_state, "install_data", [])
             if installable_plugins:
                 for plugin in installable_plugins:
                     plugin["progress"] = 0
                     self.app_state.installing_progress[plugin["name"]] = 0
-                self.install_plugins_in_background(installable_plugins)
+                _ = self.install_plugins_in_background(installable_plugins)
                 self.notify(f"Installing all {len(installable_plugins)} plugin(s)...")
         self.rich_display.refresh()
 
-    @work(exclusive=True, thread=True)
-    def upgrade_plugins_in_background(self, plugins_to_update: list[dict]) -> None:
+    @work(exclusive=True)
+    async def upgrade_plugins_in_background(
+        self, plugins_to_update: list[dict]
+    ) -> None:
         try:
-            for plugin in plugins_to_update:
-                plugin_name = plugin["name"]
-                console.log(f"Starting update for {plugin_name}")
+            console.log(
+                f"[blue]Background upgrade started for: "
+                f"{[p['name'] for p in plugins_to_update]}[/blue]"
+            )
 
+            results: list[dict] = []
+
+            async def upgrade_one(plugin: dict) -> tuple[str, dict | None]:
                 plugin_name = plugin["name"]
+
+                console.log(f"[blue]Upgrading {plugin_name}[/blue]")
 
                 def progress_cb(progress: int) -> None:
                     self.app_state.update_progress_callback(plugin_name, progress)
 
-                success = self.plugin_upgrader.upgrade_plugin(
-                    plugin, progress_callback=progress_cb
-                )
+                try:
+                    result = await self.plugin_upgrader.upgrade_plugin(
+                        plugin,
+                        progress_callback=progress_cb,
+                    )
 
-                if success:
-                    console.log(f"Successfully updated {plugin_name}")
+                    if result:
+                        console.log(f"[green]Upgraded {plugin_name}[/green]")
+                        return plugin_name, result
+                    else:
+                        console.log(f"[red]Failed upgrade {plugin_name}[/red]")
+                        return plugin_name, None
+
+                except Exception as e:
+                    console.log(f"[red]Error upgrading {plugin_name}: {e}[/red]")
+                    return plugin_name, None
+
+            tasks = [
+                asyncio.create_task(upgrade_one(plugin)) for plugin in plugins_to_update
+            ]
+
+            results_raw = await asyncio.gather(*tasks)
+
+            for name, result in results_raw:
+                if result:
+                    results.append(result)
+
+            # Update lock file once
+            if results:
+                console.log("[blue]Updating lock file after upgrade[/blue]")
+                self.plugin_upgrader.update_lock_file(results)
+
+            # Update UI state
+            for plugin in plugins_to_update:
+                if plugin.get("_internal", {}).get("update_available"):
                     plugin["_internal"]["update_available"] = False
                     plugin["current_version"] = plugin["new_version"]
-                else:
-                    console.log(f"Failed to update {plugin_name}")
-                    self.app_state.update_progress_callback(plugin_name, 0)
-            self.call_from_thread(self.rich_display.refresh)
+
+            self.rich_display.refresh()
+
+            console.log("[blue]Upgrade worker completed[/blue]")
+
         except Exception as e:
-            console.log(f"Error in background update: {e}")
-            self.call_from_thread(
-                lambda: self.notify(f"Update failed: {str(e)}", severity="error")
-            )
+            console.log(f"[red]Upgrade worker failed: {e}[/red]")
+            console.log(traceback.format_exc())
+            self.notify(f"Upgrade failed: {e}", severity="error")
 
     def action_update_marked(self) -> None:
         if self.app_state.current_tab == "Update":
@@ -304,7 +391,7 @@ class PluginManagerApp(App):
                 for plugin in marked_plugins:
                     plugin["progress"] = 0
                     self.app_state.update_progress[plugin["name"]] = 0
-                self.upgrade_plugins_in_background(marked_plugins)
+                _ = self.upgrade_plugins_in_background(marked_plugins)
                 self.notify(f"Updating {len(marked_plugins)} marked plugin(s)...")
             else:
                 self.notify("No plugins marked for update.")
@@ -318,7 +405,7 @@ class PluginManagerApp(App):
                     plugin["progress"] = 0
                     self.app_state.update_progress[plugin["name"]] = 0
                     plugin["marked"] = True
-                self.upgrade_plugins_in_background(updates_with_updates)
+                _ = self.upgrade_plugins_in_background(updates_with_updates)
                 self.notify(f"Updating all {len(updates_with_updates)} plugin(s)...")
             else:
                 self.notify("No updates available.")
@@ -335,57 +422,87 @@ class PluginManagerApp(App):
         elif self.app_state.current_selection < self.app_state.scroll_offset:
             self.app_state.scroll_offset = self.app_state.current_selection
 
-    @work(exclusive=True, thread=True)
-    def remove_plugins_in_background(self, plugins_to_remove: list[str]) -> None:
+    @work(exclusive=True)
+    async def remove_plugins_in_background(self, plugins_to_remove: list[str]) -> None:
         try:
             console.log(
-                f"[blue]Background removal started for plugins: {plugins_to_remove}[/blue]"
+                f"[blue]Background removal started for: {plugins_to_remove}[/blue]"
             )
+
+            results: list[dict] = []
             removed_plugins: list[str] = []
-            for plugin_name in plugins_to_remove:
-                console.log(f"[blue]Starting removal for {plugin_name}[/blue]")
-                success = self.plugin_remover.remove_plugin(
-                    plugin_name,
-                    progress_callback=self.app_state.remove_progress_callback,
-                )
-                if success:
-                    console.log(f"[green]Successfully removed {plugin_name}[/green]")
-                    removed_plugins.append(plugin_name)
-                else:
-                    console.log(f"[red]Failed to remove {plugin_name}[/red]")
-                    self.app_state.remove_progress_callback(plugin_name, 0)
-                    self.call_from_thread(
-                        lambda: self.notify(
-                            f"Failed to remove {plugin_name}", severity="error"
-                        )
+
+            async def remove_one(plugin_name: str) -> tuple[str, dict | None]:
+                console.log(f"[blue]Removing {plugin_name}[/blue]")
+
+                def progress_cb(name: str, progress: int) -> None:
+                    self.app_state.remove_progress_callback(name, progress)
+
+                try:
+                    result = await self.plugin_remover.remove_plugin(
+                        plugin_name,
+                        progress_callback=progress_cb,
                     )
+
+                    if result:
+                        console.log(f"[green]Removed {plugin_name}[/green]")
+                        self.app_state.remove_progress_callback(plugin_name, 100)
+                        return plugin_name, result
+                    else:
+                        console.log(f"[red]Failed {plugin_name}[/red]")
+                        self.app_state.remove_progress_callback(plugin_name, 0)
+                        return plugin_name, None
+
+                except Exception as e:
+                    console.log(f"[red]Error removing {plugin_name}: {e}[/red]")
+                    self.app_state.remove_progress_callback(plugin_name, 0)
+                    return plugin_name, None
+
+            tasks = [
+                asyncio.create_task(remove_one(name)) for name in plugins_to_remove
+            ]
+
+            results_raw = await asyncio.gather(*tasks)
+
+            # Process results
+            for name, result in results_raw:
+                if result:
+                    results.append(result)
+                    removed_plugins.append(name)
+
+            if results:
+                console.log("[blue]Updating lock file after removal[/blue]")
+                self.plugin_remover.update_lock_file(results)
+
             if removed_plugins:
                 console.log(
-                    f"[green]Refreshing remove data after successful removals: {removed_plugins}[/green]"
+                    f"[green]Updating UI after removal: {removed_plugins}[/green]"
                 )
-                self.call_from_thread(
-                    lambda: self.app_state.remove_uninstalled_plugins_from_updates(
-                        removed_plugins
+
+                self.app_state.remove_data = [
+                    p
+                    for p in self.app_state.remove_data
+                    if p["name"] not in removed_plugins
+                ]
+
+                for name in removed_plugins:
+                    self.app_state.marked_for_removal.discard(name)
+
+                if self.app_state.remove_selected >= len(self.app_state.remove_data):
+                    self.app_state.remove_selected = max(
+                        0, len(self.app_state.remove_data) - 1
                     )
-                )
-                self.call_from_thread(self.app_state.refresh_remove_data)
-                for plugin_name in removed_plugins:
-                    self.app_state.marked_for_removal.discard(plugin_name)
-                if (
-                    self.app_state.remove_selected >= len(self.app_state.remove_data)
-                    and len(self.app_state.remove_data) > 0
-                ):
-                    self.app_state.remove_selected = len(self.app_state.remove_data) - 1
-                elif len(self.app_state.remove_data) == 0:
-                    self.app_state.remove_selected = 0
-            self.call_from_thread(self.rich_display.refresh)
-            console.log("[blue]Background removal worker completed[/blue]")
+
+                self.notify(f"Removed {len(removed_plugins)} plugin(s) successfully.")
+
+            self.rich_display.refresh()
+
+            console.log("[blue]Removal worker completed[/blue]")
+
         except Exception as e:
-            console.log(f"[red]Error in background removal: {e}[/red]")
-            console.log(f"[red]Traceback: {traceback.format_exc()}[/red]")
-            self.call_from_thread(
-                lambda: self.notify(f"Removal failed: {str(e)}", severity="error")
-            )
+            console.log(f"[red]Removal worker failed: {e}[/red]")
+            console.log(traceback.format_exc())
+            self.notify(f"Removal failed: {e}", severity="error")
 
     def action_remove_marked(self) -> None:
         if self.app_state.current_tab == "Remove":
@@ -393,7 +510,7 @@ class PluginManagerApp(App):
                 marked_plugins = list(self.app_state.marked_for_removal)
                 for plugin_name in marked_plugins:
                     self.app_state.removing_progress[plugin_name] = 0
-                self.remove_plugins_in_background(marked_plugins)
+                _ = self.remove_plugins_in_background(marked_plugins)
                 self.notify(f"Removing {len(marked_plugins)} marked plugin(s)...")
             else:
                 self.notify(
