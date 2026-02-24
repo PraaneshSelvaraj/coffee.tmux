@@ -31,21 +31,15 @@ class PluginLoader:
 
             if isinstance(raw, list):
                 if len(raw) == 0:
-                    raise ValueError(
-                        f"Plugin list must not be empty in {file_path}"
-                    )
+                    raise ValueError(f"Plugin list must not be empty in {file_path}")
                 for entry in raw:
                     if not isinstance(entry, dict):
                         raise ValueError(
                             f"Each item in plugin list must be a mapping in {file_path}"
                         )
-                    self._process_plugin_entry(
-                        entry, file_path, plugin_urls, plugins
-                    )
+                    self._process_plugin_entry(entry, file_path, plugin_urls, plugins)
             elif isinstance(raw, dict):
-                self._process_plugin_entry(
-                    raw, file_path, plugin_urls, plugins
-                )
+                self._process_plugin_entry(raw, file_path, plugin_urls, plugins)
             else:
                 raise ValueError(f"Invalid plugin config in {file_path}")
 
