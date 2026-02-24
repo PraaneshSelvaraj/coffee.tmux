@@ -192,3 +192,139 @@ def test_plugin_name_derived_from_url(tmp_path: Path) -> None:
     plugin = loader.load_plugins()[0]
 
     assert plugin["name"] == "my-plugin"
+
+
+def test_load_plugins_list_format_multiple_plugins(tmp_path: Path) -> None:
+    yaml_content = """
+- url: owner/plugin-b
+- url: owner/plugin-c
+  tag: v1.0
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+    plugins = loader.load_plugins()
+
+    assert len(plugins) == 2
+    assert plugins[0]["name"] == "plugin-b"
+    assert plugins[0]["url"] == "owner/plugin-b"
+    assert plugins[1]["name"] == "plugin-c"
+    assert plugins[1]["tag"] == "v1.0"
+
+
+def test_load_plugins_list_format_full_config(tmp_path: Path) -> None:
+    yaml_content = """
+- name: custom-name
+  url: owner/repo
+  local: true
+  source:
+    - main.tmux
+  tag: v2.0
+  skip_auto_update: true
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+    plugins = loader.load_plugins()
+
+    assert len(plugins) == 1
+    assert plugins[0] == {
+        "name": "custom-name",
+        "url": "owner/repo",
+        "local": True,
+        "source": ["main.tmux"],
+        "tag": "v2.0",
+        "skip_auto_update": True,
+    }
+
+
+def test_load_plugins_hybrid_single_and_list_files(tmp_path: Path) -> None:
+    (tmp_path / "a-reset.yaml").write_text("url: owner/tmux-reset")
+    list_yaml = """
+- url: owner/plugin-a
+- url: owner/plugin-b
+"""
+    (tmp_path / "b-batch.yaml").write_text(list_yaml)
+    (tmp_path / "c-last.yaml").write_text("url: owner/plugin-last")
+
+    loader = PluginLoader(str(tmp_path))
+    plugins = loader.load_plugins()
+
+    names = [p["name"] for p in plugins]
+    assert "tmux-reset" in names
+    assert "plugin-a" in names
+    assert "plugin-b" in names
+    assert "plugin-last" in names
+
+
+def test_load_plugins_list_format_duplicate_within_list_raises(tmp_path: Path) -> None:
+    yaml_content = """
+- url: owner/repo
+- url: owner/repo
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="Duplicate plugin URL"):
+        loader.load_plugins()
+
+
+def test_load_plugins_list_format_duplicate_across_files_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.yaml").write_text("url: owner/repo")
+    list_yaml = """
+- url: owner/repo
+"""
+    (tmp_path / "b.yaml").write_text(list_yaml)
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="Duplicate plugin URL"):
+        loader.load_plugins()
+
+
+def test_load_plugins_list_format_empty_list_raises(tmp_path: Path) -> None:
+    (tmp_path / "plugins.yaml").write_text("[]")
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="must not be empty"):
+        loader.load_plugins()
+
+
+def test_load_plugins_list_format_entry_not_a_dict_raises(tmp_path: Path) -> None:
+    yaml_content = """
+- "just-a-string"
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="must be a mapping"):
+        loader.load_plugins()
+
+
+def test_load_plugins_list_format_entry_missing_url_raises(tmp_path: Path) -> None:
+    yaml_content = """
+- name: no-url-plugin
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+
+    with pytest.raises(ValueError, match="Invalid plugin config"):
+        loader.load_plugins()
+
+
+def test_load_plugins_list_format_preserves_order(tmp_path: Path) -> None:
+    yaml_content = """
+- url: owner/third
+- url: owner/first
+- url: owner/second
+"""
+    (tmp_path / "plugins.yaml").write_text(yaml_content)
+
+    loader = PluginLoader(str(tmp_path))
+    plugins = loader.load_plugins()
+
+    assert [p["name"] for p in plugins] == ["third", "first", "second"]
