@@ -66,7 +66,7 @@ def read_lock_file() -> LockData:
             if not os.path.exists(LOCK_FILE_PATH):
                 return {"plugins": []}
 
-            with open(LOCK_FILE_PATH, "r") as f:
+            with open(LOCK_FILE_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             return {"plugins": []}
@@ -79,7 +79,7 @@ def write_lock_file(data: LockData) -> None:
         try:
             os.makedirs(COFFEE_DIR, exist_ok=True)
 
-            with open(temp_file, "w") as f:
+            with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
                 f.flush()
                 os.fsync(f.fileno())

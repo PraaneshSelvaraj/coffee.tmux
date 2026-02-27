@@ -52,7 +52,7 @@ def test_write_lock_file_success() -> None:
     ):
         lfm.write_lock_file(data)
 
-        m.assert_called_once_with(lfm.LOCK_FILE_PATH + ".tmp", "w")
+        m.assert_called_once_with(lfm.LOCK_FILE_PATH + ".tmp", "w", encoding="utf-8")
         mock_file.flush.assert_called_once()
         mock_file.fileno.assert_called_once()
         mock_fsync.assert_called_once_with(42)
