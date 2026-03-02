@@ -219,13 +219,15 @@ def test_update_lock_file_discovers_tmux_sources(
 
     installer = make_installer_with_plugins()
 
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "foo", "url": "owner/repo"},
-            "used_tag": "v1.0.0",
-            "commit_hash": "abc123",
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "foo", "url": "owner/repo"},
+                "used_tag": "v1.0.0",
+                "commit_hash": "abc123",
+            }
+        ]
+    )
 
     mock_write.assert_called_once()
     written_lock = mock_write.call_args[0][0]
@@ -250,13 +252,19 @@ def test_update_lock_file_respects_explicit_source(
 ) -> None:
     installer = make_installer_with_plugins()
 
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "foo", "url": "owner/repo", "source": ["plugin.tmux"]},
-            "used_tag": "v1.0.0",
-            "commit_hash": "abc123",
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {
+                    "name": "foo",
+                    "url": "owner/repo",
+                    "source": ["plugin.tmux"],
+                },
+                "used_tag": "v1.0.0",
+                "commit_hash": "abc123",
+            }
+        ]
+    )
 
     mock_walk.assert_not_called()
     written_lock = mock_write.call_args[0][0]
@@ -286,13 +294,15 @@ def test_update_lock_file_reorders_to_match_config(
     ]
     installer = PluginInstaller(config, "/plugins/dir", "/tmux.conf")
 
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "charlie", "url": "owner/charlie"},
-            "used_tag": None,
-            "commit_hash": None,
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "charlie", "url": "owner/charlie"},
+                "used_tag": None,
+                "commit_hash": None,
+            }
+        ]
+    )
 
     written_lock = mock_write.call_args[0][0]
     names = [p["name"] for p in written_lock["plugins"]]
@@ -315,13 +325,15 @@ def test_update_lock_file_preserves_list_format_order(
     ]
     installer = PluginInstaller(config, "/plugins/dir", "/tmux.conf")
 
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "first", "url": "owner/first"},
-            "used_tag": None,
-            "commit_hash": None,
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "first", "url": "owner/first"},
+                "used_tag": None,
+                "commit_hash": None,
+            }
+        ]
+    )
 
     written_lock = mock_write.call_args[0][0]
     names = [p["name"] for p in written_lock["plugins"]]
@@ -329,13 +341,15 @@ def test_update_lock_file_preserves_list_format_order(
 
     # Simulate second install: "first" already in lock file
     mock_read.return_value = written_lock
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "third", "url": "owner/third"},
-            "used_tag": None,
-            "commit_hash": None,
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "third", "url": "owner/third"},
+                "used_tag": None,
+                "commit_hash": None,
+            }
+        ]
+    )
 
     written_lock = mock_write.call_args[0][0]
     names = [p["name"] for p in written_lock["plugins"]]
@@ -343,13 +357,15 @@ def test_update_lock_file_preserves_list_format_order(
 
     # Simulate third install
     mock_read.return_value = written_lock
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "second", "url": "owner/second"},
-            "used_tag": None,
-            "commit_hash": None,
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "second", "url": "owner/second"},
+                "used_tag": None,
+                "commit_hash": None,
+            }
+        ]
+    )
 
     written_lock = mock_write.call_args[0][0]
     names = [p["name"] for p in written_lock["plugins"]]
@@ -375,13 +391,15 @@ def test_update_lock_file_keeps_unknown_plugins_at_end(
     ]
     installer = PluginInstaller(config, "/plugins/dir", "/tmux.conf")
 
-    installer.update_lock_file([
-        {
-            "plugin": {"name": "alpha", "url": "owner/alpha"},
-            "used_tag": None,
-            "commit_hash": None,
-        }
-    ])
+    installer.update_lock_file(
+        [
+            {
+                "plugin": {"name": "alpha", "url": "owner/alpha"},
+                "used_tag": None,
+                "commit_hash": None,
+            }
+        ]
+    )
 
     written_lock = mock_write.call_args[0][0]
     names = [p["name"] for p in written_lock["plugins"]]
