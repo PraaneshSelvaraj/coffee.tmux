@@ -17,7 +17,7 @@ class PluginLoader:
                 f"Plugin directory not found: {self.coffee_plugins_list_dir}"
             )
 
-        for filename in os.listdir(self.coffee_plugins_list_dir):
+        for filename in sorted(os.listdir(self.coffee_plugins_list_dir)):
             if not filename.endswith((".yaml", ".yml")):
                 continue
 
@@ -37,9 +37,9 @@ class PluginLoader:
                         raise ValueError(
                             f"Each item in plugin list must be a mapping in {file_path}"
                         )
-                    self._process_plugin_entry(entry, file_path, plugin_urls, plugins)
+                    plugins.append(self._process_plugin_entry(entry, file_path, plugin_urls))
             elif isinstance(raw, dict):
-                self._process_plugin_entry(raw, file_path, plugin_urls, plugins)
+                plugins.append(self._process_plugin_entry(raw, file_path, plugin_urls))
             else:
                 raise ValueError(f"Invalid plugin config in {file_path}")
 
@@ -50,8 +50,7 @@ class PluginLoader:
         raw: dict[str, Any],
         file_path: str,
         plugin_urls: set[str],
-        plugins: list[dict[str, Any]],
-    ) -> None:
+    ) -> dict[str, Any]:
         plugin = self._build_plugin_config(raw)
 
         if not self._is_valid_plugin(plugin):
@@ -66,7 +65,7 @@ class PluginLoader:
 
         plugin_urls.add(normalized_url)
         plugin["url"] = normalized_url
-        plugins.append(plugin)
+        return plugin
 
     def _build_plugin_config(self, data: dict[str, Any]) -> dict[str, Any]:
         url = (data.get("url") or "").strip()
