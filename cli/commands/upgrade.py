@@ -2,11 +2,13 @@
 Upgrade command implementation
 """
 
+import asyncio
 from typing import Any
 
 from rich.progress import TaskID
 
 from core import PluginUpdater, PluginUpgrader
+from core import lock_file_manager as lfm
 
 from ..utils import (
     COFFEE_PLUGINS_DIR,
@@ -24,11 +26,16 @@ class Args:
     quiet: bool
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run upgrade command"""
     try:
         updater = PluginUpdater(COFFEE_PLUGINS_DIR)
-        updates: list[dict[str, Any]] = updater.check_for_updates()
+
+        lock_data = lfm.read_lock_file()
+        plugins = lock_data.get("plugins", [])
+
+        update_tasks = [updater.check_for_update(plugin) for plugin in plugins]
+        updates = await asyncio.gather(*update_tasks)
 
         # Filter plugins with available updates
         available_updates = [
@@ -64,17 +71,18 @@ def run(args: Args) -> int:
             print_info(f"Upgrading {len(available_updates)} plugin(s)...")
 
         upgrader = PluginUpgrader()
-        success_count = 0
+        results: list[dict[str, Any] | None] = []
 
         if args.quiet:
             # Quiet mode - no progress bars
-            for update in available_updates:
-                success = upgrader.upgrade_plugin(update)
-                if success:
-                    success_count += 1
+            tasks = [upgrader.upgrade_plugin(update) for update in available_updates]
+            results = await asyncio.gather(*tasks)
+
         else:
             # Normal mode with progress bars
             with create_progress() as progress:
+                tasks = []
+
                 for update in available_updates:
                     task_id: TaskID = progress.add_task(
                         f"Upgrading {update.get('name', 'Unknown')}", total=100
@@ -84,21 +92,17 @@ def run(args: Args) -> int:
                     def callback(percent: int, task_id: TaskID = task_id) -> None:
                         progress.update(task_id, completed=percent)
 
-                    success = upgrader.upgrade_plugin(
-                        update, progress_callback=callback
+                    tasks.append(
+                        upgrader.upgrade_plugin(update, progress_callback=callback)
                     )
 
-                    if success:
-                        success_count += 1
-                        progress.update(task_id, completed=100)
-                        console.print(
-                            f"[bold {HIGHLIGHT_COLOR}]UPGRADED[/] {update.get('name', 'Unknown')} to [bold white]{update.get('new_version', 'N/A')}[/]"
-                        )
-                    else:
-                        progress.update(task_id, completed=0)
-                        print_error(
-                            f"Failed to upgrade {update.get('name', 'Unknown')}"
-                        )
+                results = await asyncio.gather(*tasks)
+
+        successful_results = [r for r in results if r is not None]
+        if successful_results:
+            upgrader.update_lock_file(successful_results)
+
+        success_count = len(successful_results)
 
         if not args.quiet:
             if success_count == len(available_updates):

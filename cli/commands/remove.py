@@ -25,11 +25,11 @@ class Args:
     quiet: bool
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run remove command"""
     try:
         remover = PluginRemover(COFFEE_PLUGINS_DIR)
-        installed_plugins = remover.get_installed_plugins()
+        installed_plugins = await remover.get_installed_plugins()
 
         # Check if plugin exists
         plugin_to_remove: Optional[dict] = None
@@ -37,6 +37,7 @@ def run(args: Args) -> int:
             if plugin.get("name") == args.plugin:
                 plugin_to_remove = plugin
                 break
+
         if not plugin_to_remove:
             print_error(f"Plugin '{args.plugin}' is not installed")
             return 1
@@ -54,10 +55,10 @@ def run(args: Args) -> int:
         if not args.quiet:
             print_info(f"Removing {args.plugin}...")
 
-        success: bool
+        result = None
         if args.quiet:
             # Quiet mode - no progress bar
-            success = remover.remove_plugin(args.plugin)
+            result = await remover.remove_plugin(args.plugin)
         else:
             # Normal mode with progress bar
             with create_progress() as progress:
@@ -71,16 +72,17 @@ def run(args: Args) -> int:
                 ) -> None:
                     progress.update(task_id, completed=percent)
 
-                success = remover.remove_plugin(args.plugin, callback)
-                if success:
-                    progress.update(task_id, completed=100)
+                result = await remover.remove_plugin(args.plugin, callback)
 
-        if success:
+        if result is not None:
+            remover.update_lock_file([result])
+
             if not args.quiet:
                 console.print(
                     f"[bold {HIGHLIGHT_COLOR}]SUCCESS[/] Successfully removed {args.plugin}"
                 )
             return 0
+
         else:
             print_error(f"Failed to remove {args.plugin}")
             return 1

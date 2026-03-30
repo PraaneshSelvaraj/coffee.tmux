@@ -106,7 +106,7 @@ class PluginMigrator:
                 continue
 
             try:
-                with open(path, "r") as f:
+                with open(path, "r", encoding="utf-8") as f:
                     for line in f:
                         plugin = self._parse_plugin_line(line)
                         if plugin and plugin != "tmux-plugins/tpm":
@@ -137,7 +137,7 @@ class PluginMigrator:
             return {"path": path, "created": False}
 
         try:
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(
                     {"url": plugin},
                     f,

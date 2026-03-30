@@ -1,5 +1,5 @@
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -10,20 +10,20 @@ def make_remover() -> PluginRemover:
     return PluginRemover("/fake/path")
 
 
-def test_get_installed_plugins_empty() -> None:
-    with patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []}):
-        remover = make_remover()
-        plugins = remover.get_installed_plugins()
-        assert plugins == []
+@pytest.mark.asyncio
+@patch("core.lock_file_manager.read_lock_file", return_value={"plugins": []})
+async def test_get_installed_plugins_empty(mock_read: MagicMock) -> None:
+    remover = make_remover()
+    plugins = await remover.get_installed_plugins()
+    assert plugins == []
 
 
-@patch("os.path.exists", return_value=True)
-@patch("subprocess.run")
+@pytest.mark.asyncio
 @patch("core.lock_file_manager.read_lock_file")
-def test_get_installed_plugins_with_size_and_tag(
+@patch.object(PluginRemover, "_get_directory_size", new_callable=AsyncMock)
+async def test_get_installed_plugins_with_data(
+    mock_size: AsyncMock,
     mock_read: MagicMock,
-    mock_run: MagicMock,
-    mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {
         "plugins": [
@@ -38,10 +38,11 @@ def test_get_installed_plugins_with_size_and_tag(
             }
         ]
     }
-    mock_run.return_value = MagicMock(returncode=0, stdout="5.2M\t/path\n")
+
+    mock_size.return_value = "5.2M"
 
     remover = make_remover()
-    plugins = remover.get_installed_plugins()
+    plugins = await remover.get_installed_plugins()
 
     plugin = plugins[0]
     assert plugin["name"] == "test-plugin"
@@ -51,151 +52,126 @@ def test_get_installed_plugins_with_size_and_tag(
     assert plugin["installed"] == "2024-10-01"
 
 
-@patch("os.path.exists", return_value=False)
+@pytest.mark.asyncio
 @patch("core.lock_file_manager.read_lock_file")
-def test_get_installed_plugins_path_missing(
+@patch.object(PluginRemover, "_remove_directory", new_callable=AsyncMock)
+async def test_remove_plugin_success(
+    mock_remove: AsyncMock,
     mock_read: MagicMock,
-    mock_exists: MagicMock,
 ) -> None:
-    mock_read.return_value = {
-        "plugins": [
-            {
-                "name": "missing-plugin",
-                "enabled": False,
-                "git": {
-                    "commit_hash": "abc123456789",
-                    "last_pull": None,
-                },
-            }
-        ]
-    }
+    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
 
     remover = make_remover()
-    plugins = remover.get_installed_plugins()
+    result = await remover.remove_plugin("plugin1")
 
-    plugin = plugins[0]
-    assert plugin["size"] == "Unknown"
-    assert plugin["version"] == "abc1234"
-    assert plugin["installed"] == "Unknown"
+    assert result == {"plugin_name": "plugin1"}
+    mock_remove.assert_awaited_once()
 
 
-@patch("os.path.exists", return_value=True)
-@patch("subprocess.run", side_effect=OSError("du failed"))
+@pytest.mark.asyncio
 @patch("core.lock_file_manager.read_lock_file")
-def test_get_installed_plugins_du_failure(
-    mock_read: MagicMock,
-    mock_run: MagicMock,
-    mock_exists: MagicMock,
-) -> None:
-    mock_read.return_value = {
-        "plugins": [{"name": "plugin", "enabled": True, "git": {"tag": "v2.0.0"}}]
-    }
+async def test_remove_plugin_not_in_lock(mock_read: MagicMock) -> None:
+    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
 
     remover = make_remover()
-    plugins = remover.get_installed_plugins()
-    assert plugins[0]["size"] == "Unknown"
+    result = await remover.remove_plugin("missing")
+
+    assert result is None
 
 
-@patch("os.path.exists", return_value=True)
-@patch("shutil.rmtree")
+@pytest.mark.asyncio
+@patch("core.lock_file_manager.read_lock_file")
+@patch.object(
+    PluginRemover,
+    "_remove_directory",
+    new_callable=AsyncMock,
+    side_effect=OSError("permission denied"),
+)
+async def test_remove_plugin_directory_failure_raises(
+    mock_remove: AsyncMock,
+    mock_read: MagicMock,
+) -> None:
+    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
+
+    remover = make_remover()
+
+    with pytest.raises(OSError):
+        await remover.remove_plugin("plugin1")
+
+
+@pytest.mark.asyncio
+@patch("core.lock_file_manager.read_lock_file")
+@patch.object(PluginRemover, "_remove_directory", new_callable=AsyncMock)
+async def test_remove_plugin_progress_callback(
+    mock_remove: AsyncMock,
+    mock_read: MagicMock,
+) -> None:
+    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
+
+    calls: list[tuple[str, int]] = []
+
+    def cb(name: str, p: int) -> None:
+        calls.append((name, p))
+
+    remover = make_remover()
+    await remover.remove_plugin("plugin1", progress_callback=cb)
+
+    assert calls == [
+        ("plugin1", 10),
+        ("plugin1", 40),
+        ("plugin1", 100),
+    ]
+
+
+@pytest.mark.asyncio
+@patch("core.lock_file_manager.read_lock_file", side_effect=OSError("read error"))
+async def test_remove_plugin_read_lock_failure_raises(
+    mock_read: MagicMock,
+) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def cb(name: str, p: int) -> None:
+        calls.append((name, p))
+
+    remover = make_remover()
+
+    with pytest.raises(OSError):
+        await remover.remove_plugin("plugin1", progress_callback=cb)
+
+    assert calls[-1] == ("plugin1", 0)
+
+
 @patch("core.lock_file_manager.write_lock_file")
 @patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_success(
+def test_update_lock_file_success(
     mock_read: MagicMock,
     mock_write: MagicMock,
-    mock_rmtree: MagicMock,
-    mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1"}, {"name": "plugin2"}]}
 
     remover = make_remover()
-    result = remover.remove_plugin("plugin1")
 
-    assert result is True
-    mock_rmtree.assert_called_once_with("/fake/path/plugin1")
+    updated = remover.update_lock_file([{"plugin_name": "plugin1"}])
+
+    assert updated is True
+    mock_write.assert_called_once()
 
     written = mock_write.call_args[0][0]
     assert len(written["plugins"]) == 1
     assert written["plugins"][0]["name"] == "plugin2"
 
 
-@patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_not_in_lock(mock_read: MagicMock) -> None:
-    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
-
-    remover = make_remover()
-    assert remover.remove_plugin("missing") is False
-
-
-@patch("os.path.exists", return_value=True)
-@patch("shutil.rmtree", side_effect=OSError("permission denied"))
-@patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_directory_failure_raises(
-    mock_read: MagicMock,
-    mock_rmtree: MagicMock,
-    mock_exists: MagicMock,
-) -> None:
-    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
-    remover = make_remover()
-
-    with pytest.raises(OSError):
-        remover.remove_plugin("plugin1")
-
-
-@patch("os.path.exists", return_value=False)
 @patch("core.lock_file_manager.write_lock_file")
 @patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_directory_missing_still_updates_lock(
+def test_update_lock_file_no_changes(
     mock_read: MagicMock,
     mock_write: MagicMock,
-    mock_exists: MagicMock,
 ) -> None:
     mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
 
     remover = make_remover()
-    assert remover.remove_plugin("plugin1") is True
-    mock_write.assert_called_once()
 
+    updated = remover.update_lock_file([{"plugin_name": "missing"}])
 
-@patch("os.path.exists", return_value=True)
-@patch("shutil.rmtree")
-@patch("core.lock_file_manager.write_lock_file")
-@patch("core.lock_file_manager.read_lock_file")
-def test_remove_plugin_progress_callback(
-    mock_read: MagicMock,
-    mock_write: MagicMock,
-    mock_rmtree: MagicMock,
-    mock_exists: MagicMock,
-) -> None:
-    mock_read.return_value = {"plugins": [{"name": "plugin1"}]}
-    calls: list[tuple[str, int]] = []
-
-    def cb(name: str, p: int) -> None:
-        calls.append((name, p))
-
-    remover = make_remover()
-    assert remover.remove_plugin("plugin1", progress_callback=cb) is True
-
-    assert calls == [
-        ("plugin1", 10),
-        ("plugin1", 40),
-        ("plugin1", 70),
-        ("plugin1", 100),
-    ]
-
-
-@patch("core.lock_file_manager.read_lock_file", side_effect=OSError("read error"))
-def test_remove_plugin_read_lock_failure_raises(
-    mock_read: MagicMock,
-) -> None:
-    calls: list[tuple[str, int]] = []
-
-    def cb(name: str, p: int) -> None:
-        calls.append((name, p))
-
-    remover = make_remover()
-
-    with pytest.raises(OSError):
-        remover.remove_plugin("plugin1", progress_callback=cb)
-
-    assert calls[-1] == ("plugin1", 0)
+    assert updated is False
+    mock_write.assert_not_called()

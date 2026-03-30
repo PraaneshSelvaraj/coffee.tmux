@@ -1,6 +1,5 @@
-import subprocess
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,13 +23,19 @@ def make_plan(
     }
 
 
-@patch.object(PluginUpgrader, "_upgrade_to_tag")
-@patch.object(PluginUpgrader, "_get_local_head_commit", return_value="finalcommit")
-@patch.object(PluginUpgrader, "_write_lockfile_update")
-def test_upgrade_plugin_tag_success(
-    mock_write: MagicMock,
-    mock_head: MagicMock,
-    mock_upgrade: MagicMock,
+@pytest.mark.asyncio
+@patch.object(
+    PluginUpgrader, "_upgrade_to_tag", new_callable=AsyncMock, return_value=True
+)
+@patch.object(
+    PluginUpgrader,
+    "_get_local_head_commit",
+    new_callable=AsyncMock,
+    return_value="finalcommit",
+)
+async def test_upgrade_plugin_tag_success(
+    mock_head: AsyncMock,
+    mock_upgrade: AsyncMock,
 ) -> None:
     upgrader = PluginUpgrader()
     plan = make_plan(update_type="tag")
@@ -40,54 +45,57 @@ def test_upgrade_plugin_tag_success(
     def progress_cb(p: int) -> None:
         progress_calls.append(p)
 
-    success = upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
+    result = await upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
 
-    assert success is True
-    mock_upgrade.assert_called_once()
-    mock_write.assert_called_once_with(
-        name="plugin1",
-        new_tag="v2.0.0",
-        new_commit="finalcommit",
-    )
+    assert result is not None
+    assert result["plugin_name"] == "plugin1"
+    assert result["new_commit"] == "finalcommit"
+    mock_upgrade.assert_awaited_once()
 
     assert progress_calls[0] == 10
     assert progress_calls[-1] == 100
 
 
-@patch.object(PluginUpgrader, "_upgrade_to_commit")
-@patch.object(PluginUpgrader, "_get_local_head_commit", return_value="finalcommit")
-@patch.object(PluginUpgrader, "_write_lockfile_update")
-def test_upgrade_plugin_commit_success(
-    mock_write: MagicMock,
-    mock_head: MagicMock,
-    mock_upgrade: MagicMock,
+@pytest.mark.asyncio
+@patch.object(
+    PluginUpgrader, "_upgrade_to_commit", new_callable=AsyncMock, return_value=True
+)
+@patch.object(
+    PluginUpgrader,
+    "_get_local_head_commit",
+    new_callable=AsyncMock,
+    return_value="finalcommit",
+)
+async def test_upgrade_plugin_commit_success(
+    mock_head: AsyncMock,
+    mock_upgrade: AsyncMock,
 ) -> None:
     upgrader = PluginUpgrader()
     plan = make_plan(update_type="commit")
 
-    success = upgrader.upgrade_plugin(plan)
+    result = await upgrader.upgrade_plugin(plan)
 
-    assert success is True
-    mock_upgrade.assert_called_once()
-    mock_write.assert_called_once()
+    assert result is not None
+    assert result["plugin_name"] == "plugin1"
+    mock_upgrade.assert_awaited_once()
 
 
-def test_upgrade_plugin_no_update_available() -> None:
+@pytest.mark.asyncio
+async def test_upgrade_plugin_no_update_available() -> None:
     upgrader = PluginUpgrader()
     plan = make_plan(update_available=False)
 
-    success = upgrader.upgrade_plugin(plan)
+    result = await upgrader.upgrade_plugin(plan)
 
-    assert success is False
+    assert result is None
 
 
+@pytest.mark.asyncio
 @patch.object(
-    PluginUpgrader,
-    "_upgrade_to_tag",
-    side_effect=subprocess.CalledProcessError(1, "git"),
+    PluginUpgrader, "_upgrade_to_tag", new_callable=AsyncMock, return_value=False
 )
-def test_upgrade_plugin_failure_reports_zero_progress_and_raises(
-    mock_upgrade: MagicMock,
+async def test_upgrade_plugin_tag_failure_returns_none(
+    mock_upgrade: AsyncMock,
 ) -> None:
     upgrader = PluginUpgrader()
     plan = make_plan(update_type="tag")
@@ -97,68 +105,37 @@ def test_upgrade_plugin_failure_reports_zero_progress_and_raises(
     def progress_cb(p: int) -> None:
         progress_calls.append(p)
 
-    with pytest.raises(subprocess.CalledProcessError):
-        upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
+    result = await upgrader.upgrade_plugin(plan, progress_callback=progress_cb)
 
+    assert result is None
     assert progress_calls[-1] == 0
 
 
-@patch("subprocess.run")
-def test_upgrade_to_tag_executes_git_commands(mock_run: MagicMock) -> None:
+@pytest.mark.asyncio
+@patch.object(
+    PluginUpgrader, "_get_local_head_commit", new_callable=AsyncMock, return_value=None
+)
+@patch.object(
+    PluginUpgrader, "_upgrade_to_tag", new_callable=AsyncMock, return_value=True
+)
+async def test_upgrade_plugin_missing_head_commit_returns_none(
+    mock_upgrade: AsyncMock,
+    mock_head: AsyncMock,
+) -> None:
     upgrader = PluginUpgrader()
+    plan = make_plan(update_type="tag")
 
-    calls: list[int] = []
+    result = await upgrader.upgrade_plugin(plan)
 
-    def progress(p: int) -> None:
-        calls.append(p)
-
-    upgrader._upgrade_to_tag(
-        plugin_path="/fake/plugins/plugin1",
-        tag="v2.0.0",
-        progress=progress,
-    )
-
-    assert mock_run.call_count == 2
-
-    fetch_cmd = mock_run.call_args_list[0][0][0]
-    checkout_cmd = mock_run.call_args_list[1][0][0]
-
-    assert fetch_cmd[:2] == ["git", "fetch"]
-    assert "refs/tags/v2.0.0" in fetch_cmd[-1]
-    assert checkout_cmd == ["git", "checkout", "--detach", "tags/v2.0.0"]
-
-    assert calls == [40, 70]
+    assert result is None
 
 
-@patch("subprocess.run")
-def test_upgrade_to_commit_executes_git_commands(mock_run: MagicMock) -> None:
-    upgrader = PluginUpgrader()
-
-    calls: list[int] = []
-
-    def progress(p: int) -> None:
-        calls.append(p)
-
-    upgrader._upgrade_to_commit(
-        plugin_path="/fake/plugins/plugin1",
-        commit="abc123",
-        progress=progress,
-    )
-
-    assert mock_run.call_count == 2
-
-    fetch_cmd = mock_run.call_args_list[0][0][0]
-    checkout_cmd = mock_run.call_args_list[1][0][0]
-
-    assert fetch_cmd == ["git", "fetch", "origin", "abc123"]
-    assert checkout_cmd == ["git", "checkout", "--detach", "abc123"]
-
-    assert calls == [40, 70]
+# ---------- Lock File Tests ----------
 
 
 @patch("core.lock_file_manager.write_lock_file")
 @patch("core.lock_file_manager.read_lock_file")
-def test_write_lockfile_update(
+def test_update_lock_file_success(
     mock_read: MagicMock,
     mock_write: MagicMock,
 ) -> None:
@@ -176,16 +153,37 @@ def test_write_lockfile_update(
 
     upgrader = PluginUpgrader()
 
-    upgrader._write_lockfile_update(
-        name="plugin1",
-        new_tag="v2.0.0",
-        new_commit="def456",
-    )
+    results = [
+        {
+            "plugin_name": "plugin1",
+            "new_tag": "v2.0.0",
+            "new_commit": "def456",
+            "last_pull": "timestamp",
+        }
+    ]
 
+    updated = upgrader.update_lock_file(results)
+
+    assert updated is True
     mock_write.assert_called_once()
-    written = mock_write.call_args[0][0]
 
-    plugin = written["plugins"][0]["git"]
-    assert plugin["tag"] == "v2.0.0"
-    assert plugin["commit_hash"] == "def456"
-    assert "last_pull" in plugin
+    written = mock_write.call_args[0][0]
+    plugin_git = written["plugins"][0]["git"]
+
+    assert plugin_git["tag"] == "v2.0.0"
+    assert plugin_git["commit_hash"] == "def456"
+    assert plugin_git["last_pull"] == "timestamp"
+
+
+@patch("core.lock_file_manager.write_lock_file")
+@patch("core.lock_file_manager.read_lock_file")
+def test_update_lock_file_no_results(
+    mock_read: MagicMock,
+    mock_write: MagicMock,
+) -> None:
+    upgrader = PluginUpgrader()
+
+    updated = upgrader.update_lock_file([])
+
+    assert updated is False
+    mock_write.assert_not_called()

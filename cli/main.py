@@ -3,6 +3,8 @@ Coffee CLI - Main entry point
 """
 
 import argparse
+import asyncio
+import inspect
 import os
 import sys
 import traceback
@@ -101,7 +103,7 @@ Examples:
     list_parser = subparsers.add_parser("list", help="List installed plugins")
     list_parser.add_argument("--table", action="store_true", help="Display as table")
     list_parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
-    list_parser.set_defaults(func=lambda args: list_plugins.run(args))
+    list_parser.set_defaults(func=list_plugins.run)
 
     # Info command
     info_parser = subparsers.add_parser("info", help="Show plugin information")
@@ -148,7 +150,10 @@ def main() -> int:
     # Handle commands
     if hasattr(args, "func"):
         try:
-            return args.func(args)
+            if inspect.iscoroutinefunction(args.func):
+                return asyncio.run(args.func(args))
+            else:
+                return args.func(args)
         except KeyboardInterrupt:
             print("\nOperation cancelled by user")
             return 1

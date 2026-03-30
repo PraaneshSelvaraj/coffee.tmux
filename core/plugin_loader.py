@@ -17,32 +17,57 @@ class PluginLoader:
                 f"Plugin directory not found: {self.coffee_plugins_list_dir}"
             )
 
-        for filename in os.listdir(self.coffee_plugins_list_dir):
+        for filename in sorted(os.listdir(self.coffee_plugins_list_dir)):
             if not filename.endswith((".yaml", ".yml")):
                 continue
 
             file_path = os.path.join(self.coffee_plugins_list_dir, filename)
 
-            with open(file_path, "r") as f:
-                raw = yaml.safe_load(f) or {}
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f)
 
-            plugin = self._build_plugin_config(raw)
+            if raw is None:
+                raw = {}
 
-            if not self._is_valid_plugin(plugin):
+            if isinstance(raw, list):
+                if len(raw) == 0:
+                    raise ValueError(f"Plugin list must not be empty in {file_path}")
+                for entry in raw:
+                    if not isinstance(entry, dict):
+                        raise ValueError(
+                            f"Each item in plugin list must be a mapping in {file_path}"
+                        )
+                    plugins.append(
+                        self._process_plugin_entry(entry, file_path, plugin_urls)
+                    )
+            elif isinstance(raw, dict):
+                plugins.append(self._process_plugin_entry(raw, file_path, plugin_urls))
+            else:
                 raise ValueError(f"Invalid plugin config in {file_path}")
 
-            normalized_url = self._normalize_url(plugin["url"])
-
-            if normalized_url in plugin_urls:
-                raise ValueError(
-                    f"Duplicate plugin URL detected for repository '{normalized_url}' (in {file_path})"
-                )
-
-            plugin_urls.add(normalized_url)
-            plugin["url"] = normalized_url
-            plugins.append(plugin)
-
         return plugins
+
+    def _process_plugin_entry(
+        self,
+        raw: dict[str, Any],
+        file_path: str,
+        plugin_urls: set[str],
+    ) -> dict[str, Any]:
+        plugin = self._build_plugin_config(raw)
+
+        if not self._is_valid_plugin(plugin):
+            raise ValueError(f"Invalid plugin config in {file_path}")
+
+        normalized_url = self._normalize_url(plugin["url"])
+
+        if normalized_url in plugin_urls:
+            raise ValueError(
+                f"Duplicate plugin URL detected for repository '{normalized_url}' (in {file_path})"
+            )
+
+        plugin_urls.add(normalized_url)
+        plugin["url"] = normalized_url
+        return plugin
 
     def _build_plugin_config(self, data: dict[str, Any]) -> dict[str, Any]:
         url = (data.get("url") or "").strip()

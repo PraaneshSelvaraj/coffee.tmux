@@ -2,9 +2,10 @@
 Update command implementation
 """
 
-from typing import Any
+import asyncio
 
 from core import PluginUpdater
+from core import lock_file_manager as lfm
 
 from ..utils import (
     ACCENT_COLOR,
@@ -20,13 +21,20 @@ class Args:
     quiet: bool
 
 
-def run(args: Args) -> int:
+async def run(args: Args) -> int:
     """Run update command"""
     try:
         if not args.quiet:
             print_info("Checking for plugin updates...")
+
         updater = PluginUpdater(COFFEE_PLUGINS_DIR)
-        updates: list[dict[str, Any]] = updater.check_for_updates()
+
+        lock_data = lfm.read_lock_file()
+        plugins = lock_data.get("plugins", [])
+
+        tasks = [updater.check_for_update(plugin) for plugin in plugins]
+
+        updates = await asyncio.gather(*tasks)
 
         if not updates:
             if not args.quiet:

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import subprocess
@@ -5,51 +6,45 @@ from datetime import datetime
 from typing import Any, Callable
 
 from core import lock_file_manager as lfm
-from core.lock_file_manager import LockData
 
 
 class PluginRemover:
     def __init__(self, plugin_base_dir: str) -> None:
         self.plugin_base_dir = plugin_base_dir
 
-    def get_installed_plugins(
-        self,
-    ) -> list[dict[str, str | bool | dict[str, Any]]]:
-        """
-        Return installed plugins with UI-friendly metadata.
-        """
+    async def get_installed_plugins(self) -> list[dict[str, Any]]:
         lock_data = lfm.read_lock_file()
         plugins = lock_data.get("plugins", [])
 
-        installed_plugins: list[dict[str, str | bool | dict[str, Any]]] = []
-
+        tasks = []
         for plugin in plugins:
             plugin_name = plugin.get("name", "")
             plugin_path = os.path.join(self.plugin_base_dir, plugin_name)
+            tasks.append(self._get_directory_size(plugin_path))
 
-            size = self._get_directory_size(plugin_path)
-            version = self._get_plugin_version(plugin)
-            installed_time = self._format_installed_time(
-                plugin.get("git", {}).get("last_pull")
-            )
+        sizes = await asyncio.gather(*tasks)
 
+        installed_plugins = []
+        for plugin, size in zip(plugins, sizes):
             installed_plugins.append(
                 {
-                    "name": plugin_name,
-                    "version": version,
+                    "name": plugin["name"],
+                    "version": self._get_plugin_version(plugin),
                     "size": size,
-                    "installed": installed_time,
+                    "installed": self._format_installed_time(
+                        plugin.get("git", {}).get("last_pull")
+                    ),
                     "enabled": plugin.get("enabled", False),
                 }
             )
 
         return installed_plugins
 
-    def remove_plugin(
+    async def remove_plugin(
         self,
         plugin_name: str,
         progress_callback: Callable[[str, int], None] | None = None,
-    ) -> bool:
+    ) -> dict[str, Any] | None:
         """
         Remove a plugin directory and update the lock file.
         """
@@ -66,37 +61,49 @@ class PluginRemover:
 
             if not self._plugin_exists_in_lock(plugin_name, plugins):
                 progress(0)
-                return False
+                return None
 
             progress(40)
-            self._remove_directory(plugin_name)
-
-            progress(70)
-            self._update_lock_file(lock_data, plugin_name)
+            await self._remove_directory(plugin_name)
 
             progress(100)
-            return True
+            return {"plugin_name": plugin_name}
 
         except (OSError, ValueError):
             progress(0)
             raise
 
-    def _remove_directory(self, plugin_name: str) -> None:
+    async def _remove_directory(self, plugin_name: str) -> None:
         plugin_path = os.path.join(self.plugin_base_dir, plugin_name)
 
         if os.path.exists(plugin_path):
             try:
-                shutil.rmtree(plugin_path)
+                await asyncio.to_thread(shutil.rmtree, plugin_path)
             except OSError as e:
                 raise OSError(
                     f"Failed to remove plugin directory: {plugin_path}"
                 ) from e
 
-    def _update_lock_file(self, lock_data: LockData, plugin_name: str) -> None:
+    def update_lock_file(self, removed: list[dict[str, str]]) -> bool:
+        if not removed:
+            return False
+
+        lock_data = lfm.read_lock_file()
+        removed_names = {r["plugin_name"] for r in removed}
+
+        original_len = len(lock_data.get("plugins", []))
+
         lock_data["plugins"] = [
-            p for p in lock_data.get("plugins", []) if p.get("name") != plugin_name
+            p
+            for p in lock_data.get("plugins", [])
+            if p.get("name") not in removed_names
         ]
-        lfm.write_lock_file(lock_data)
+
+        if len(lock_data["plugins"]) != original_len:
+            lfm.write_lock_file(lock_data)
+            return True
+
+        return False
 
     def _plugin_exists_in_lock(
         self,
@@ -105,23 +112,28 @@ class PluginRemover:
     ) -> bool:
         return any(p.get("name") == plugin_name for p in plugins)
 
-    def _get_directory_size(self, plugin_path: str) -> str:
+    async def _get_directory_size(self, plugin_path: str) -> str:
         if not os.path.exists(plugin_path):
             return "Unknown"
 
         try:
-            result = subprocess.run(
-                ["du", "-sh", plugin_path],
-                capture_output=True,
-                text=True,
-                check=False,
+            process = await asyncio.create_subprocess_exec(
+                "du",
+                "-sh",
+                plugin_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            if result.returncode == 0:
-                return result.stdout.strip().split()[0]
+
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return "Unknown"
+
+            return stdout.decode().strip().split()[0]
+
         except (OSError, subprocess.SubprocessError):
             return "Unknown"
-
-        return "Unknown"
 
     def _get_plugin_version(self, plugin: dict[str, Any]) -> str:
         git_info = plugin.get("git", {})

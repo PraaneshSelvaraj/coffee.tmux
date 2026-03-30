@@ -150,7 +150,19 @@ Fields:
 - `tag`: Optional GitHub tag
 - `skip_auto_update` : Disable automatic updates (default: false)
 - `source`: List of plugin source script files loaded by tmux
-  
+
+### Multiple Plugins per File
+
+One plugin per file is the recommended approach. However, you can also group multiple plugins in a single YAML file using a list:
+
+```yaml
+# ~/.config/tmux/coffee/plugins/my-plugins.yaml
+- url: "tmux-plugins/tmux-sensible"
+- url: "tmux-plugins/tmux-resurrect"
+```
+
+Files are loaded in alphabetical order, so plugin sourcing order is determined first by filename, then by position within the file.
+
 ## Usage
 
 ### CLI Commands
