@@ -225,6 +225,20 @@ class PluginInstaller:
 
             lock_data["plugins"].append(plugin_data)
 
+        # Reorder to match the config order
+        plugin_names = [p["name"] for p in self.plugins_config]
+        plugins_by_name: dict[str, dict[str, Any]] = {
+            p["name"]: p for p in lock_data["plugins"]
+        }
+
+        ordered: list[dict[str, Any]] = []
+        for name in plugin_names:
+            if name in plugins_by_name:
+                ordered.append(plugins_by_name.pop(name))
+
+        ordered.extend(plugins_by_name.values())
+
+        lock_data["plugins"] = ordered
         lfm.write_lock_file(lock_data)
 
     def _discover_tmux_sources(self, plugin_path: str) -> list[str]:
