@@ -37,7 +37,9 @@ class PluginLoader:
                         raise ValueError(
                             f"Each item in plugin list must be a mapping in {file_path}"
                         )
-                    plugins.append(self._process_plugin_entry(entry, file_path, plugin_urls))
+                    plugins.append(
+                        self._process_plugin_entry(entry, file_path, plugin_urls)
+                    )
             elif isinstance(raw, dict):
                 plugins.append(self._process_plugin_entry(raw, file_path, plugin_urls))
             else:
