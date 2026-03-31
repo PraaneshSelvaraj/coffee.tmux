@@ -51,12 +51,11 @@ git clone https://github.com/PraaneshSelvaraj/coffee.tmux ~/.local/share/coffee
 
 Coffee.tmux runs in its own dedicated Python environment to avoid dependency conflicts with your system Python.
 
-Create and install dependencies into Coffee’s virtual environment:
+Run the installer:
 
 ```bash
 cd ~/.local/share/coffee
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+./install.sh
 ```
 
 > Coffee always runs using this environment. You do not need to activate it manually.

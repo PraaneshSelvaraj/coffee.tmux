@@ -6,9 +6,7 @@ PYTHON="$COFFEE_DIR/.venv/bin/python"
 if [ ! -x "$PYTHON" ]; then
   echo "Coffee error: Python venv not found."
   echo "Run:"
-  echo "  cd ~/.local/share/coffee"
-  echo "  python3 -m venv .venv"
-  echo "  .venv/bin/pip install -r requirements.txt"
+  echo "  cd ~/.local/share/coffee && ./install.sh"
   exit 1
 fi
 
