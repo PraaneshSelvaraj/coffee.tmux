@@ -30,36 +30,6 @@ cd coffee.tmux
 git checkout -b feature/your-feature-name
 ```
 
-## Branching Model
-
-Coffee.tmux follows a simple and predictable branching model to keep development organized and releases stable.
-
-### `main`
-
-- Contains **stable, production-ready** code only
-- Always reflects the latest released version
-- Release tags (`v0.x.y`) are created from this branch
-- Direct pushes to `main` are restricted
-
-### `develop`
-
-- Primary branch for **active development**
-- New features, improvements, and non-critical fixes are merged here first
-- May contain changes that are not yet released
-
-### Pull Requests
-
-- All pull requests **must target `develop`**
-- Do **not** open pull requests directly against `main`
-- Small, focused pull requests are preferred
-- Larger changes should be discussed in an issue before implementation
-
-### Releases
-
-- Releases are created by merging `develop` into `main`
-- Each release is tagged using semantic versioning (`v0.x.y`)
-- Hotfixes may be applied directly to `develop` and included in the next release
-
 ## Project Structure (High-level)
 
 While the structure may evolve, at a high level:
@@ -181,7 +151,7 @@ git commit -m "Add feature X to improve plugin loading"
 git push origin feature/your-feature-name
 ```
 
-3. Open a Pull Request (PR) to the main repository’s `develop` branch.
+3. Open a Pull Request (PR) to the main repository’s `main` branch.
 
 ## Reporting Issues
 
