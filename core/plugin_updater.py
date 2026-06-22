@@ -126,7 +126,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get local head commit timed out") from e
 
             if process.returncode != 0:
                 return None
@@ -151,7 +156,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get repo size timed out") from e
 
             if process.returncode != 0:
                 return "Unknown"
@@ -182,7 +192,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get time since tag timed out") from e
 
             if process.returncode != 0:
                 return "Unknown"
@@ -217,7 +232,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get remote tags timed out") from e
 
             if process.returncode != 0:
                 return []
@@ -247,7 +267,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get latest commit timed out") from e
 
             if process.returncode != 0:
                 return None
@@ -272,7 +297,12 @@ class PluginUpdater:
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
-            stdout, _ = await process.communicate()
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError as e:
+                process.kill()
+                await process.wait()
+                raise RuntimeError("Get tag commit hash timed out") from e
 
             if process.returncode != 0:
                 return None
