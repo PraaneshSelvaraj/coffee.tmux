@@ -74,7 +74,12 @@ class PluginInstaller:
             stderr=asyncio.subprocess.DEVNULL,
         )
 
-        await process.wait()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=120)
+        except asyncio.TimeoutError as e:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Git clone timed out") from e
 
         if process.returncode != 0:
             raise RuntimeError("Git clone failed")
@@ -118,7 +123,12 @@ class PluginInstaller:
             stderr=asyncio.subprocess.DEVNULL,
         )
 
-        stdout, _ = await process.communicate()
+        try:
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+        except asyncio.TimeoutError as e:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Git fetch latest tag timed out") from e
 
         if process.returncode != 0:
             return None
@@ -166,7 +176,13 @@ class PluginInstaller:
             stderr=asyncio.subprocess.DEVNULL,
         )
 
-        await process.wait()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=120)
+        except asyncio.TimeoutError as e:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Verify git tag exists timed out") from e
+
         return process.returncode == 0
 
     async def _get_commit_hash(self, plugin: dict[str, Any]) -> str | None:
@@ -181,7 +197,12 @@ class PluginInstaller:
             stderr=asyncio.subprocess.DEVNULL,
         )
 
-        stdout, _ = await process.communicate()
+        try:
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=120)
+        except asyncio.TimeoutError as e:
+            process.kill()
+            await process.wait()
+            raise RuntimeError("Get commit hash timed out") from e
 
         if process.returncode != 0:
             return None
