@@ -24,8 +24,8 @@ from cli.commands import (
     update,
     upgrade,
 )
-from cli.utils import print_version, setup_directories
-from core import PluginSourcer
+from cli.utils import COFFEE_PLUGINS_DIR, print_version, setup_directories
+from core import AutoUpdater, PluginSourcer
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -54,6 +54,11 @@ Examples:
         "--source-plugins",
         action="store_true",
         help="Source enabled plugins (internal use)",
+    )
+    parser.add_argument(
+        "--background-upgrade",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
@@ -137,6 +142,11 @@ def main() -> int:
     # Handle global flags
     if getattr(args, "version", False):
         print_version()
+        return 0
+
+    if getattr(args, "background_upgrade", False):
+        setup_directories()
+        asyncio.run(AutoUpdater(plugins_dir=COFFEE_PLUGINS_DIR).run_upgrades())
         return 0
 
     if getattr(args, "source_plugins", False):

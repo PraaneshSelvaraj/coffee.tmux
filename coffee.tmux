@@ -5,4 +5,6 @@ VENV_PY="$COFFEE_DIR/.venv/bin/python"
 
 bind-key C run-shell "tmux display-popup -E '$VENV_PY $COFFEE_DIR/ui.py'"
 
+run-shell -b "$VENV_PY $COFFEE_DIR/cli/main.py --background-upgrade"
+
 run-shell "$VENV_PY $COFFEE_DIR/cli/main.py --source-plugins"
