@@ -12,6 +12,7 @@ Modules:
 """
 
 from . import lock_file_manager
+from .auto_updater import AutoUpdater
 from .plugin_installer import PluginInstaller
 from .plugin_loader import PluginLoader
 from .plugin_migrator import PluginMigrator
@@ -21,6 +22,7 @@ from .plugin_updater import PluginUpdater
 from .plugin_upgrader import PluginUpgrader
 
 __all__ = [
+    "AutoUpdater",
     "PluginSourcer",
     "PluginInstaller",
     "PluginMigrator",

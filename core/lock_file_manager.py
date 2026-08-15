@@ -4,6 +4,8 @@ import time
 from contextlib import contextmanager
 from typing import Any, Generator, TypedDict
 
+from typing_extensions import NotRequired
+
 COFFEE_DIR: str = os.path.expanduser("~/.tmux/coffee")
 LOCK_FILE_PATH: str = os.path.join(COFFEE_DIR, "caffeine-lock.json")
 
@@ -13,8 +15,14 @@ LOCK_TIMEOUT: float = 5.0
 LOCK_POLL_INTERVAL: float = 0.05
 
 
-class LockData(TypedDict):
+class LockMetadata(TypedDict):
+    last_auto_update_check: int
+    last_self_update_check: int
+
+
+class LockData(TypedDict, total=False):
     plugins: list[dict[str, Any]]
+    metadata: NotRequired[LockMetadata]
 
 
 @contextmanager
